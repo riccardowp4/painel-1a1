@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<title>Acompanhamento de 1:1</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<div id="auth" class="wrap"><p class="hint" style="text-align:center;margin-top:60px">Carregando…</p></div>
+<div id="publico" class="wrap" hidden></div>
+<div id="master" hidden>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Painel de 1:1</h1>
+      <p class="sub">Liderados diretos de Riccardo · 1:1 bimestral de 45 min · Ciclo 1: 13 a 29 de outubro de 2026 <span id="vivo" class="vivo off">○ conectando…</span></p>
+    </div>
+    <button class="btn sec" id="sair">Sair</button>
+  </header>
+  <nav class="tabs" role="tablist" id="tabs">
+    <button role="tab" data-tab="geral" aria-selected="true">Visão geral</button>
+    <button role="tab" data-tab="pessoas" aria-selected="false">Pessoas</button>
+    <button role="tab" data-tab="agenda" aria-selected="false">Agenda</button>
+    <button role="tab" data-tab="clima" aria-selected="false">Clima</button>
+    <button role="tab" data-tab="kpis" aria-selected="false">KPIs</button>
+    <button role="tab" data-tab="acessos" aria-selected="false">Acessos</button>
+    <button role="tab" data-tab="historico" aria-selected="false">Histórico</button>
+  </nav>
+  <section id="tab-geral"></section>
+  <section id="tab-pessoas" hidden></section>
+  <section id="tab-agenda" hidden></section>
+  <section id="tab-clima" hidden></section>
+  <section id="tab-kpis" hidden></section>
+  <section id="tab-acessos" hidden></section>
+  <section id="tab-historico" hidden></section>
+</div>
+</div>
+<dialog class="ficha" id="ficha" aria-label="Ficha individual"></dialog>
+<dialog class="ficha" id="previa" aria-label="Como a pessoa vê a página"></dialog>
+<div id="tip" hidden></div>
+<div id="toast" class="toast" role="status" hidden></div>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
+<script src="app.js"></script>
+</body>
+</html>
