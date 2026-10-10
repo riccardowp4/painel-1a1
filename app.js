@@ -171,11 +171,11 @@ function renderAgenda(){
   const ocup={};P.forEach(p=>ocup[slotDe(p)]=p);
   const dias=DIAS.map(([d,l])=>`<div class="panel day"><h3>${l}</h3>${SLOTS.filter(s=>s.d===d).map(s=>{
     const p=ocup[s.id];
-    return p?`<button class="slot" data-open="${p.id}"><span class="hr">${s.a}–${s.b}</span><span class="who"><span class="av" style="width:26px;height:26px;font-size:11px" aria-hidden="true">${esc(ini(p.nome))}</span><span class="t">${esc(p.nome)}</span>${feito(p.id)?'<span class="ok" title="Realizado">✓</span>':''}</span></button>`
+    return p?`<button class="slot" data-open="${p.id}"><span class="hr">${s.a}–${s.b}</span><span class="who"><span class="av" style="width:26px;height:26px;font-size:11px" aria-hidden="true">${esc(ini(p.nome))}</span><span class="t">${esc(p.nome)}${emailDe(p.id)?`<br><span class="hint" style="font-size:11px">${esc(emailDe(p.id))}</span>`:''}</span>${feito(p.id)?'<span class="ok" title="Realizado">✓</span>':''}</span></button>`
       :`<div class="slot free"><span class="hr">${s.a}–${s.b}</span><span>Livre · reserva</span></div>`}).join('')}</div>`).join('');
   $('#tab-agenda').innerHTML=`<div class="panel" style="margin-bottom:16px"><h2>Ciclo 1: 13 a 29 de outubro</h2>
     <p class="hint" style="margin:0 0 12px">Terças e quintas, 4 blocos de 45 min por dia (10:00 às 11:30 e 14:00 às 15:30). Os ${P.length} 1:1s ocupam as duas primeiras semanas (13 a 22/10); 27 e 29/10 ficam de reserva para remarcações. A ordem começa por quem pede mais atenção e por quem ainda não tem linha de base. Próximo ciclo: a partir de 15/12/2026. Para mudar um horário, abra a ficha da pessoa.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn" id="ics-ciclo">Colocar o ciclo no meu Outlook (.ics)</button><span class="hint">Abra o arquivo baixado: o Outlook mostra os ${P.length} horários na sua agenda. Para enviar os convites com Teams, use "Abrir no Outlook" na ficha de cada pessoa.</span></div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn" id="ics-ciclo">Colocar o ciclo no meu Outlook (.ics)</button><span class="hint">O arquivo traz os ${P.length} horários com o e-mail de cada pessoa como convidada. Abrir o arquivo coloca as reuniões na sua agenda, mas não envia convite a ninguém. Para enviar o convite com Teams, use "Abrir no Outlook" na ficha de cada pessoa.</span></div></div>
   <div class="days">${dias}</div>`;
 }
 
@@ -401,9 +401,10 @@ function linkOutlookWeb(p){
   const em=emailDe(p.id);if(em)q.set('to',em);
   return 'https://outlook.office.com/calendar/0/deeplink/compose?'+q.toString()}
 function baixarCiclo(){
-  const ev=P.map(p=>eventoDaPessoa(p,false)).filter(Boolean);
+  const ev=P.map(p=>eventoDaPessoa(p,true)).filter(Boolean);
   if(!ev.length){toast('Nenhum horário definido.');return}
-  baixarIcs(`1a1 - ${CICLO} - agenda completa.ics`,ev);toast(`${ev.length} reuniões no arquivo. Abra-o para colocar no Outlook.`)}
+  const sem=P.filter(p=>SLOT_BY_ID[slotDe(p)]&&!emailDe(p.id)).length;
+  baixarIcs(`1a1 - ${CICLO} - agenda completa.ics`,ev);toast(`${ev.length} reuniões no arquivo, ${ev.length-sem} com convidado. Abra-o para colocar no Outlook.`)}
 function baixarDaPessoa(pid){
   const p=PB[pid],ev=eventoDaPessoa(p,true);if(!ev){toast('Defina o horário primeiro.');return}
   baixarIcs(`1a1 - ${p.nome}.ics`,[ev])}
