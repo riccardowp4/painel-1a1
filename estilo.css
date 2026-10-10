@@ -194,5 +194,8 @@ input[type=email],input[type=password],input[type=text]{min-width:0}
   body{background:#fff;color:#000}
   .panel,.stat,.hist{break-inside:avoid}
   .sec{break-after:avoid}
+  header.top .sub,#sair{display:none!important}
+  .panel.rot{break-inside:auto}
+  details{display:block}details>summary{list-style:none}
 }
 a.btn{text-decoration:none;display:inline-flex;align-items:center}

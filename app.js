@@ -204,9 +204,6 @@ function renderKpis(){
 function ficha(id){
   const p=PB[id];S.open=id;const d=$('#ficha');
   const a=areaDe(p), kp=cfg(id).kpi[CICLO], t=totais(p,kp), mudou=p.area!==p.areaOriginal;
-  const pauta=PAUTA_BASE.map(([m,tt,dd])=>{
-    const ex=['kpi','comp','pdi'].includes(dd)?(p.pauta||[]).filter(x=>x[0]===dd).map(x=>`<li>${esc(x[1])}</li>`).join(''):'';
-    return `<li><span class="min">${m}'</span><span><span class="tt">${tt}</span>${ex?`<ul class="dd" style="padding-left:16px;margin:2px 0 0">${ex}</ul>`:`<br><span class="dd">${dd}</span>`}</span></li>`}).join('');
   const kRow=(g,l)=>`<tr><td>${esc(l)}</td><td><input type="text" data-kg="${g}" data-k="${slug(l)}" data-f="meta" value="${esc((kp[slug(l)]||{}).meta||'')}" placeholder="a definir" aria-label="Meta: ${esc(l)}"></td><td style="width:96px"><input type="number" min="0" max="100" data-kg="${g}" data-k="${slug(l)}" data-f="ating" value="${esc((kp[slug(l)]||{}).ating??'')}" aria-label="Atingimento: ${esc(l)}"></td></tr>`;
   d.innerHTML=`<div class="fi">
    <div class="fi-top"><div class="l"><span class="av" aria-hidden="true">${esc(ini(p.nome))}</span><div style="min-width:0"><h2>${esc(p.nome)}</h2><div class="sub">${esc(p.cargo||'')}</div></div></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">${pill(p)}<button class="btn sec" id="ver-como">Ver como a pessoa vê</button><button class="x" data-close aria-label="Fechar">×</button></div></div>
@@ -217,7 +214,7 @@ function ficha(id){
    <div class="panel"><h3>O que o 360° diz (ago/2026)</h3><p style="margin:0 0 8px"><strong>Pontos fortes:</strong> ${esc(p.fortesTxt||'')}</p>${(p.melhTxt||[]).length?`<p style="margin:0 0 4px"><strong>Pontos de melhoria (${p.melh}):</strong></p><ul>${p.melhTxt.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p style="margin:0"><strong>Pontos de melhoria:</strong> nenhum registrado.</p>'}<p class="hint" style="margin:8px 0 0">Síntese dos comentários anônimos. O 360° é confidencial: não cite avaliadores. Esta parte só você vê.</p></div>
    <div class="panel"><h3>O que a pessoa escreveu para o 1:1</h3><div id="fi-pessoa"></div></div>
    <div class="panel"><h3>Último 1:1 antes do ciclo</h3>${p.ultimo?`<p style="margin:0 0 4px"><strong>${esc(p.ultimo.data)}</strong> · <span class="hint">${esc(p.ultimo.fonte||'')}</span></p><p style="margin:0">${esc(p.ultimo.resumo)}</p>`:`<p class="hint" style="margin:0">Sem registro anterior.${p.obs?' '+esc(p.obs):''}</p>`}</div>
-   <div class="panel"><h3>Pauta sugerida · 45 min</h3><ul class="pauta">${pauta}</ul></div>
+   <div class="panel"><h3>Roteiro do 1:1 · 45 min</h3><p class="hint" style="margin:0 0 8px">Estrutura do 1:1 da Katia, preenchida para ${esc(p.nome.split(' ')[0])} (${TIPO_ROT[roteiro(p).tipo]}).</p>${htmlRoteiro(p)}</div>
    <div class="panel"><h3>KPIs do ciclo</h3><p class="hint">Salva ao sair do campo. A pessoa vê a meta e o atingimento na hora.</p>
      <div class="tot"><div><div class="l">Performance (70%)</div><div class="v" id="t-pf">${pct(t.pf)}</div></div><div><div class="l">Comportamental (30%)</div><div class="v" id="t-cp">${pct(t.cp)}</div></div><div><div class="l">Total</div><div class="v" id="t-tot">${pct(t.tot)}</div></div></div>
      <div class="scroll"><table><thead><tr><th>KPI</th><th>Meta (definida com a pessoa)</th><th>Atingimento %</th></tr></thead><tbody>
@@ -230,9 +227,9 @@ function ficha(id){
      <div class="two"><div class="field"><label for="f-data">Data</label><input id="f-data" type="date" value="${hoje()}"></div><div class="field"><label for="f-humor">Como a pessoa chegou</label><select id="f-humor"><option value="3">Regular</option><option value="1">Muito mal</option><option value="2">Abaixo do normal</option><option value="4">Bem</option><option value="5">Muito bem</option></select></div></div>
      <div class="field"><label for="f-res">O que foi conversado (a pessoa vê)</label><textarea id="f-res" placeholder="KPIs, comportamento, carreira, o que a pessoa pediu de você"></textarea></div>
      <div class="field"><label for="f-prox">Combinados e próximos passos (a pessoa vê)</label><textarea id="f-prox"></textarea></div>
-     <div class="field"><label for="f-nota">Nota privada (só você vê)</label><textarea id="f-nota"></textarea></div>
+     <div class="field"><label for="f-nota">Nota privada (só você vê): aqui entra o que for pessoal</label><textarea id="f-nota"></textarea></div>
      <label style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><input type="checkbox" id="f-dev"> Devolvi o que mudou desde o último 1:1</label>
-     <button class="btn" id="f-save">Salvar 1:1</button></div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="f-save">Salvar 1:1</button><button class="btn sec" id="f-estrutura">Preencher com a estrutura do roteiro</button></div></div>
    <div class="panel"><h3>1:1s deste ciclo</h3><div id="fi-hist"></div></div>
    <div class="panel"><h3>Histórico de mudanças desta pessoa</h3><div id="fi-atu"></div></div>
   </div>`;
@@ -293,6 +290,92 @@ async function salvarKpi(p,chave,grupo,campo,valor){
   const r=await S.sb.from('kpis').upsert(linha,{onConflict:'pessoa_id,ciclo,chave'});if(r.error)throw r.error;
   await CARGA.kpis();
 }
+
+/* ---- 45-roteiro.js ---- */
+/* ===== Roteiro do 1:1 no formato do 1:1 da Katia (10/02/2026) =====
+   1. Objetivos · 2. Pontos de discussão (momento atual, processos e eficiência, visão estratégica)
+   3. Ações definidas · 4. Feedback e observações · 5. Próximos passos · registro.
+   Nada pessoal é pré-preenchido: as perguntas pessoais são só convites; o que a pessoa contar vai na nota privada. */
+const ESTRUTURA=[
+  ['obj',3,'1. Objetivos da reunião'],
+  ['atual',7,'2a. Momento atual: profissional e pessoal'],
+  ['proc',12,'2b. Processos e eficiência: KPIs de performance (70%)'],
+  ['visao',8,'2c. Visão estratégica: carreira e desenvolvimento'],
+  ['fb',7,'4. Feedback e observações: comportamental e 360° (30%)'],
+  ['acoes',5,'3. Ações definidas'],
+  ['prox',3,'5. Próximos passos']];
+const ACOMPANHAR=[
+  ['Energia e motivação','Como chegou (1 a 5) e se mudou desde o último 1:1.'],
+  ['Carga de trabalho','Está dando conta no horário? O que pode sair, ser delegado ou automatizado?'],
+  ['Risco de saída','Sinais de desânimo, proposta externa, pedido de mudança. O que a faz querer ficar?'],
+  ['Relacionamento com o time','Atritos que viraram pessoais, com quem precisa alinhar.'],
+  ['Desenvolvimento','Curso, leitura ou projeto em andamento e o que já aplicou.'],
+  ['Reconhecimento','Quando foi a última vez que recebeu um reconhecimento específico.'],
+  ['Momento de vida','Só o que a pessoa quiser contar e que afete agenda, foco ou flexibilidade. Registrar só na nota privada.']];
+function perfilRot(p){
+  const r=risco(p);
+  if(/novo|entrou|recém/i.test((p.obs||'')+(p.motivo||''))||p.id==='paulo')return 'novo';
+  if(r==='novo')return 'regular';
+  if(/estagi/i.test(p.cargo||''))return 'estagio';
+  if(r==='atencao')return 'atencao';
+  if(!p.melh)return 'referencia';
+  return 'regular';
+}
+function roteiro(p){
+  const tipo=perfilRot(p),nome=p.nome.split(' ')[0];
+  const pz=t=>(p.pauta||[]).filter(x=>x[0]===t).map(x=>x[1]);
+  const pend=acoesDe(p).filter(a=>!a.done);
+  const kpis=perfList(p).slice(0,4);
+  const S1={
+    novo:['Primeiro 1:1 estruturado: entender como está a chegada e o que ainda falta para fazer bem o trabalho.','Combinar metas e métricas desde o início (linha de base do ciclo 1).','Traçar a rota individual: onde está, onde quer chegar.'],
+    estagio:['Alinhar como está o estágio e o que é preciso para a efetivação.','Combinar metas e métricas do ciclo (70% performance, 30% comportamental).','Definir o plano de aprendizado até o fim do estágio.'],
+    atencao:['Devolver o que mudou desde o último 1:1 e o que o 360° mostrou.','Combinar metas e métricas dos KPIs (70% performance, 30% comportamental).','Fechar um plano de ação curto para os pontos de atenção.'],
+    referencia:['Reconhecer o resultado do 360° (sem críticas) de forma específica.','Combinar metas e métricas do ciclo.','Discutir novo desafio, projeto ou papel de referência para o time.'],
+    regular:['Primeiro 1:1 do ciclo: entender o momento e as expectativas.','Combinar metas e métricas dos KPIs (70% performance, 30% comportamental).','Traçar ou revisar a rota individual de desenvolvimento.']}[tipo];
+  if(p.ultimo)S1.unshift(`Retomar o 1:1 de ${p.ultimo.data}: o que foi entregue e o que travou.`);
+  const atual=['Como você está? O que mudou desde a última conversa (no trabalho e, se quiser contar, fora dele)?','O que te motiva a vir trabalhar hoje? E o que mais te desgasta?','Precisa de alguma flexibilidade de agenda neste período?'];
+  if(tipo==='novo')atual.push('Como está sendo a adaptação: pessoas, sistemas, acessos, o que ninguém te explicou?');
+  if(tipo==='estagio')atual.push('Como está conciliando estágio e estudos? Previsão de formatura?');
+  const proc=[...pz('kpi'),`KPIs da área para definir meta com ${nome}: ${kpis.join('; ')}.`,'Qual é a rotina da semana? A agenda está bloqueada para o trabalho de foco (como a da Katia)?','O que é retrabalho ou interrupção hoje e como cortar.'];
+  const visao=[...pz('pdi'),'Onde você está e onde quer chegar em 1 ano? Gestão, especialista ou outra área?','Qual especialização ou curso faria diferença agora? A empresa pode apoiar.'];
+  if(tipo==='referencia')visao.push('Topa ser referência ou mentor em algum tema para o time?');
+  const fb=[];
+  if(p.fortesTxt)fb.push('Reconhecer: '+p.fortesTxt);
+  (p.melhTxt||[]).forEach(x=>fb.push('Trabalhar: '+x));
+  pz('comp').forEach(x=>fb.push(x));
+  fb.push('Mentalidade de dono: trazer ideia que evita problema ou reduz custo, não só apagar incêndio.');
+  fb.push('Lembrete: 360° é confidencial. Fale do comportamento, nunca de quem avaliou.');
+  const acoes=[...pend.map(a=>`Confirmar: ${a.tx}${a.pz?' (prazo '+a.pz+')':''}`),'Fechar no máximo 3 combinados, cada um com dono e prazo.'];
+  const prox=['A pessoa traz a rota escrita (onde está, onde quer chegar, especialização) em até 15 dias, pelo "Preparar 1:1" do painel.','Registrar o 1:1 no painel logo depois. A pessoa vê o resumo e os combinados; o pessoal fica só na nota privada.','Próximo 1:1: ciclo 2, a partir de 15/12/2026.'];
+  return {tipo,secoes:{obj:S1,atual,proc,visao,fb,acoes,prox}};
+}
+const TIPO_ROT={novo:'Recém-chegado',estagio:'Estágio',atencao:'Pede atenção',referencia:'Referência',regular:'Em desenvolvimento'};
+function htmlRoteiro(p,{compacto}={}){
+  const r=roteiro(p);
+  const sec=ESTRUTURA.map(([k,m,t])=>`<li><span class="min">${m}'</span><span><span class="tt">${t}</span><ul class="dd" style="padding-left:16px;margin:2px 0 0">${r.secoes[k].map(x=>`<li>${esc(x)}</li>`).join('')}</ul></span></li>`).join('');
+  const ac=ACOMPANHAR.map(([t,d])=>`<li><strong>${t}:</strong> ${esc(d)}</li>`).join('');
+  return `<ul class="pauta">${sec}</ul>
+    <details ${compacto?'':'open'} style="margin-top:10px"><summary><strong>Para acompanhar a cada 1:1 (profissional e pessoal)</strong></summary><ul class="l" style="margin-top:6px">${ac}</ul></details>`;
+}
+function textoEstrutura(){
+  return {res:'Objetivos:\n\nMomento atual:\n\nProcessos e eficiência (KPIs):\n\nVisão estratégica (carreira):\n\nFeedback e observações:\n',
+          prox:'Ações definidas (dono e prazo):\n- \n\nPróximos passos:\n'};
+}
+function renderRoteiros(){
+  const ord=[...P].sort((a,b)=>String(slotDe(a)).localeCompare(String(slotDe(b))));
+  $('#tab-roteiros').innerHTML=`<div class="panel"><h2>Roteiros do ciclo 1</h2>
+    <p class="hint" style="margin:0 0 10px">Mesma estrutura do 1:1 da Katia de 10/02: objetivos, pontos de discussão (momento atual, processos e eficiência, visão estratégica), ações, feedback e próximos passos, ajustada para 45 minutos. O conteúdo de cada pessoa vem do 360°, do último 1:1, das ações abertas e dos KPIs da área. Nada pessoal vem preenchido: as perguntas pessoais são convites, e o que a pessoa contar fica só na sua nota privada.</p>
+    <button class="btn" id="rot-pdf">Exportar PDF</button></div>
+    ${ord.map((p,i)=>{const s=SLOT_BY_ID[slotDe(p)];return `<div class="panel rot" style="${i?'break-before:page':''}"><h2 style="margin-bottom:2px">${esc(p.nome)}</h2>
+      <p class="hint" style="margin:0 0 10px">${esc(p.cargo||p.area||'')} · ${s?esc(s.dl)+' · '+s.a+' às '+s.b:'sem horário'} · ${TIPO_ROT[roteiro(p).tipo]} · 360° ${f2(p.m)}</p>${htmlRoteiro(p,{compacto:true})}</div>`}).join('')}`;
+}
+addEventListener('beforeprint',()=>{if(S.papel==='admin')$$('#tab-roteiros details').forEach(d=>d.open=true)});
+document.addEventListener('click',e=>{
+  if(S.papel!=='admin')return;
+  const t=e.target;
+  if(t.id==='rot-pdf'){window.print();return}
+  if(t.id==='f-estrutura'){const x=textoEstrutura();if(!$('#f-res').value.trim())$('#f-res').value=x.res;if(!$('#f-prox').value.trim())$('#f-prox').value=x.prox;$('#f-res').focus();return}
+});
 
 /* ---- 50-eventos-master.js ---- */
 /* ===== Eventos do painel do diretor ===== */
@@ -356,12 +439,12 @@ document.addEventListener('pointermove',e=>{
 });
 
 /* ===== Render do painel ===== */
-const ABAS=['geral','pessoas','agenda','clima','kpis','acessos','historico'];
+const ABAS=['geral','pessoas','agenda','roteiros','clima','kpis','acessos','historico'];
 function render(){
   if(S.papel!=='admin')return;
   $$('#tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===S.tab)));
   ABAS.forEach(k=>$('#tab-'+k).hidden=k!==S.tab);
-  ({geral:renderGeral,pessoas:renderPessoas,agenda:renderAgenda,clima:renderClima,kpis:renderKpis,acessos:renderAcessos,historico:renderHistorico})[S.tab]();
+  ({geral:renderGeral,pessoas:renderPessoas,agenda:renderAgenda,roteiros:renderRoteiros,clima:renderClima,kpis:renderKpis,acessos:renderAcessos,historico:renderHistorico})[S.tab]();
 }
 function onData(ts){render();if($('#ficha').open)fichaDin();if($('#previa').open&&S.previaId)abrirPrevia(S.previaId)}
 
