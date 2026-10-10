@@ -371,7 +371,7 @@ function roteiro(p){
   const qa=perguntasArea(p)||{perguntas:[],trilhas:[],medir:[]};
   const pdi=(S.perfil[p.id]||{}).pdi||{};
   const B={};
-  B.atual={ctx:[...(p.ultimo?[`Último 1:1 (${p.ultimo.data}): ${p.ultimo.resumo}`]:['Sem 1:1 registrado antes deste ciclo.'])],
+  B.atual={ctx:['Aviso antes de gravar: '+AVISO_GRAVACAO.replace(/"/g,''),...(p.ultimo?[`Último 1:1 (${p.ultimo.data}): ${p.ultimo.resumo}`]:['Sem 1:1 registrado antes deste ciclo.'])],
     q:['Pense nas últimas 4 semanas: qual foi o melhor momento no trabalho? E o pior?','O que mais ocupou o seu tempo? Era o que deveria ocupar?','No termômetro de 1 a 5: o que puxaria cada nota para cima?','O que mudou desde a nossa última conversa?','Tem algo fora do trabalho pesando ou ajudando que eu deva saber para te apoiar? Só se quiser contar.',
       ...(tipo==='novo'?['Como está a adaptação: pessoas, sistemas, acessos, o que ninguém te explicou?']:[]),
       ...(tipo==='estagio'?['Como está conciliando estágio e faculdade?']:[])]};
@@ -561,16 +561,26 @@ function perguntasArea(p){
   if(/estagi/i.test(p.cargo||''))return Object.assign({},AREA_Q[p.area]||{},ESTAGIO_Q);
   return AREA_Q[p.area]||null;
 }
+const AVISO_GRAVACAO='"Antes de começar: vou gravar a nossa conversa com os óculos, só para eu não perder nada e montar o seu plano de desenvolvimento. A gravação fica comigo, não é compartilhada e eu apago depois de registrar. No painel entra um resumo do que combinarmos, e você vê tudo o que for registrado sobre o seu trabalho. Se preferir que eu não grave, ou que eu pare em algum momento, é só falar. Tudo bem?"';
+const REGRA_REGISTRO=['Resumo e combinados (a pessoa vê): só fatos e combinados de trabalho, com data e número quando houver.',
+  'Descreva comportamento, não rótulo: "entregou o fechamento 2 dias depois do combinado", e não "é desorganizada".',
+  'Escreva como se a pessoa fosse ler. Pela LGPD ela pode pedir acesso ao que está registrado sobre ela, inclusive à nota privada (ponto a confirmar com o advogado).',
+  'Saúde, família, religião e vida pessoal: só o que a pessoa contou por vontade própria e que afete o trabalho, curto e factual, e só na nota privada. Nada de diagnóstico ou suposição.',
+  'Nunca registre opinião sobre terceiros nomeados (outros colegas) nem o que alguém disse no 360°.',
+  'Áudio e transcrição: apague depois de lançar no painel. Guardar só pelo tempo necessário reduz risco.'];
 const GUIA=[
   ['Antes do 1:1 (até 2 dias antes)',[
     'Lembre a pessoa de preencher "Preparar meu 1:1" no painel (conquistas, dificuldades, o que precisa de você, proposta de metas).',
     'Abra a ficha: leia o roteiro, o que a pessoa escreveu, as ações abertas e o último 1:1. 10 minutos bastam.',
     'Confira as metas da empresa e da equipe na aba KPIs, para poder falar dos 60% que são coletivos.',
     'Escolha 1 reconhecimento específico para fazer. Reconhecimento foi a 3ª nota mais baixa do clima (3,93).']],
-  ['Abertura (2 min) e gravação',[
-    'Diga que vai gravar com os óculos, para quê (registrar e montar o plano de desenvolvimento) e que só você acessa. Peça o ok. Se a pessoa não quiser, não grave e anote depois.',
+  ['Abertura (2 min): aviso de gravação',[
+    'Leia a frase de aviso (abaixo) antes de ligar os óculos e espere o "tudo bem". Se a pessoa não quiser, não grave e anote no modo de condução.',
     'Deixe claro que o 1:1 é dela: "este tempo é seu; o que você quer garantir que a gente fale hoje?" (Grove: o 1:1 é a reunião do liderado).',
-    'Evite assuntos médicos ou disciplinares na gravação. Se surgirem, pare a gravação ou registre só o essencial.']],
+    'Se surgir assunto médico, disciplinar ou muito pessoal, ofereça pausar a gravação.']],
+  ['Frase de aviso (leia no início de cada 1:1)',[
+    AVISO_GRAVACAO]],
+  ['Regra do registro (o que entra no painel)',REGRA_REGISTRO],
   ['Antes do bloco 1: devolutiva (1 min)',[
     'Comece devolvendo o que mudou desde a última conversa. "Opiniões levadas em consideração" foi a pior nota de liderança do clima (3,74), e a devolutiva é o que move essa nota.']],
   ['1. Momento atual (6 min): concreto, não subjetivo',[
@@ -782,6 +792,109 @@ document.addEventListener('click',async e=>{
   if(t.id==='acf-limpa'){S.acf={sit:'',tipo:''};renderAcompanhamento()}
 });
 
+/* ---- 49-avaliacao.js ---- */
+/* ===== Avaliação 360° entre colegas e dos liderados sobre o diretor =====
+   Anônima por construção no banco (ver sql/07): a resposta não guarda quem avaliou, ninguém lê as tabelas
+   direto e os resultados só saem agregados, com 3 ou mais avaliações. */
+const AVAL_ITENS={
+  colega:[['comunicacao','Comunicação clara e escuta'],['agenda','Organização, foco e prazos'],['proatividade','Iniciativa e melhoria contínua'],['colaboracao','Colaboração com outras áreas'],['equilibrio','Equilíbrio e abertura a feedback'],['tecnica','Domínio técnico da função'],['entregas','Qualidade e confiabilidade das entregas']],
+  diretor:[['direcao','Dá direção clara e prioridades'],['escuta','Escuta e leva opiniões em consideração'],['reconhece','Reconhece o trabalho bem feito'],['feedback','Dá feedback regular e útil'],['transparencia','É transparente sobre decisões'],['desenvolve','Apoia o meu desenvolvimento']]};
+const AV_ESC=['','Discordo totalmente','Discordo','Neutro','Concordo','Concordo totalmente'];
+async function rpcAv(fn,args){const r=await S.sb.rpc(fn,args||{});if(r.error)throw r.error;return r.data}
+/* ---------- pessoa ---------- */
+async function carregarAvPessoa(){
+  try{S.av={ciclo:await rpcAv('aval_ciclo_atual'),lista:await rpcAv('aval_minha_lista'),meu:await rpcAv('aval_meu_resultado')}}catch(e){S.av={erro:erroAmigavel(e)}}
+}
+function secaoAval(prev){
+  if(prev)return '<div class="panel"><p class="def" style="margin:0">A avaliação 360° é anônima e só aparece para a própria pessoa.</p></div>';
+  const av=S.av||{};if(av.erro)return `<div class="panel"><p class="def" style="margin:0">Não foi possível carregar a avaliação: ${esc(av.erro)}</p></div>`;
+  const c=av.ciclo,partes=[];
+  if(S.avForm)return formAval(S.avForm);
+  if(c&&c.status==='aberto'){
+    const l=av.lista||[],feitos=l.filter(x=>x.feito||x.recusou).length;
+    partes.push(`<div class="panel"><h2>${esc(c.nome)}</h2>
+      <p style="margin:0 0 8px">Avalie o Riccardo e os colegas com quem você trabalha. <strong>É anônimo:</strong> o sistema não guarda quem respondeu, e ninguém, nem o Riccardo, vê respostas individuais. Os resultados só aparecem quando a pessoa recebe 3 ou mais avaliações.</p>
+      <div class="pb" style="height:8px"><i style="width:${l.length?100*feitos/l.length:0}%"></i></div><p class="hint" style="margin:6px 0 0">${feitos} de ${l.length} respondidos ou marcados como "não convivo".</p></div>
+      <div class="rg">${l.map(x=>`<button class="rc av-c ${x.feito?'ok':x.recusou?'pul':''}" ${x.feito||x.recusou?'disabled':''} data-avaliar="${esc(x.id)}" data-tipo="${x.tipo}" data-nome="${esc(x.nome)}">
+        <span class="h"><span class="av" aria-hidden="true">${esc(ini(x.nome))}</span><span class="nm">${esc(x.nome)}</span></span>
+        <span class="sl">${x.feito?'✓ Avaliado':x.recusou?'Não convivo o suficiente':x.tipo==='diretor'?'Avaliação do seu gestor':'Avaliar'}</span></button>`).join('')}</div>`);
+  }
+  if(av.meu)partes.push(resultadoMeu(av.meu));
+  if(!partes.length)partes.push('<div class="panel"><p class="def" style="margin:0">Nenhuma avaliação 360° aberta no momento. Quando o Riccardo abrir, ela aparece aqui.</p></div>');
+  return partes.join('');
+}
+function formAval(fm){
+  const itens=AVAL_ITENS[fm.tipo];
+  return `<div class="panel"><button class="btn sec sm" id="av-voltar">← Voltar</button>
+    <h2 style="margin:12px 0 2px">${fm.tipo==='diretor'?'Avaliação do seu gestor':'Avaliar '+esc(fm.nome)}</h2>
+    <p class="hint">De 1 (discordo totalmente) a 5 (concordo totalmente). Use "não sei" quando não tiver como avaliar. Mínimo de 3 itens. Anônimo.</p>
+    ${itens.map(([k,l])=>`<div class="av-it"><div class="tx">${l}</div><div class="esc">${[1,2,3,4,5].map(n=>`<button class="${fm.notas[k]===n?'on v'+n:''}" data-avn="${k}" data-v="${n}" aria-label="${l}: ${n}, ${AV_ESC[n]}" title="${AV_ESC[n]}">${n}</button>`).join('')}<button class="ns ${fm.notas[k]===0?'on':''}" data-avn="${k}" data-v="0">não sei</button></div></div>`).join('')}
+    <div class="field" style="margin-top:12px"><label for="av-f">O que ${fm.tipo==='diretor'?'ele':'essa pessoa'} faz muito bem (opcional)</label><textarea id="av-f" maxlength="1000" rows="3">${esc(fm.forte||'')}</textarea></div>
+    <div class="field"><label for="av-m">O que poderia fazer melhor (opcional)</label><textarea id="av-m" maxlength="1000" rows="3">${esc(fm.melhorar||'')}</textarea></div>
+    <p class="hint">Evite detalhes que identifiquem você (datas, episódios só seus). Escreva sobre comportamento, não sobre a pessoa.</p>
+    <div class="nav2"><button class="btn sec" id="av-pular">Não convivo o suficiente para avaliar</button><button class="btn" id="av-enviar">Enviar avaliação</button></div></div>`;
+}
+function barrasAval(medias,tipo,ref){
+  return `<div class="avb">${AVAL_ITENS[tipo].map(([k,l])=>{const v=medias&&medias[k],r=ref&&ref[k];
+    return `<div class="avr"><span class="tx">${l}</span><span class="trk2">${v!=null?`<i class="bar" style="--w:${(v-1)/4*100}%" data-tip="${esc(l)}: ${f2(v)}"></i>`:''}${r!=null?`<b class="ref" style="--x:${(r-1)/4*100}%" data-tip="Média do time: ${f2(r)}"></b>`:''}</span><span class="num">${v!=null?f2(v):'—'}</span></div>`}).join('')}</div>`;
+}
+function comentarios(m){
+  return `${m.fortes&&m.fortes.length?`<h3 style="margin-top:12px">O que fazem muito bem</h3><ul class="l">${m.fortes.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}${m.melhorar&&m.melhorar.length?`<h3 style="margin-top:12px">O que poderia melhorar</h3><ul class="l">${m.melhorar.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}`;
+}
+function resultadoMeu(r){
+  const m=r.meu||{};
+  if(m.insuficiente)return `<div class="panel"><h2>Meu resultado 360°</h2><p class="def" style="margin:0">Você recebeu ${m.n} avaliação(ões). O resultado só aparece com 3 ou mais, para proteger quem respondeu.</p></div>`;
+  return `<div class="panel"><h2>Meu resultado 360°</h2><p class="hint">${m.n} avaliações · média geral ${f2(m.geral)} de 5. A marca vertical é a média do time.</p>${legenda([['Você','var(--c70)'],['Média do time','var(--ink2)']])}${barrasAval(m.medias,'colega',r.time)}${comentarios(m)}</div>`;
+}
+document.addEventListener('click',async e=>{
+  if(S.papel!=='pessoa')return;const t=e.target;
+  const c=t.closest('[data-avaliar]');if(c&&!c.disabled){S.avForm={id:c.dataset.avaliar,tipo:c.dataset.tipo,nome:c.dataset.nome,notas:{}};renderPessoa();window.scrollTo(0,0);return}
+  if(!S.avForm)return;
+  const sync=()=>{S.avForm.forte=($('#av-f')||{}).value||'';S.avForm.melhorar=($('#av-m')||{}).value||''};
+  const n=t.closest('[data-avn]');if(n){sync();S.avForm.notas[n.dataset.avn]=Number(n.dataset.v);renderPessoa();return}
+  if(t.id==='av-voltar'){S.avForm=null;renderPessoa();return}
+  if(t.id==='av-pular'||t.id==='av-enviar'){sync();t.disabled=true;
+    try{
+      if(t.id==='av-pular')await rpcAv('aval_pular',{p_avaliado:S.avForm.id});
+      else{const notas=Object.fromEntries(Object.entries(S.avForm.notas).filter(([,v])=>v>0));
+        if(Object.keys(notas).length<3){toast('Responda pelo menos 3 itens.');t.disabled=false;return}
+        await rpcAv('aval_enviar',{p_avaliado:S.avForm.id,p_notas:notas,p_forte:S.avForm.forte,p_melhorar:S.avForm.melhorar})}
+      S.avForm=null;await carregarAvPessoa();renderPessoa();toast(t.id==='av-pular'?'Marcado.':'Avaliação enviada. Obrigado!');
+    }catch(er){t.disabled=false;toast('Não foi possível enviar: '+erroAmigavel(er))}}
+});
+/* ---------- diretor ---------- */
+async function renderAvaliacaoAdm(){
+  const el=$('#tab-aval');el.innerHTML='<p class="hint">Carregando…</p>';
+  let c,part,res;
+  try{c=await rpcAv('aval_ciclo_atual');part=c?await rpcAv('aval_participacao_resumo'):[];res=c&&c.status!=='aberto'?await rpcAv('aval_resultados'):null}
+  catch(er){el.innerHTML=`<div class="panel"><p class="def">Não foi possível carregar: ${esc(erroAmigavel(er))}</p></div>`;return}
+  const nome=id=>id==='diretor'?'Riccardo (você)':(PB[id]||{}).nome||id;
+  const ativos=new Set(S.acessos.filter(a=>a.user_id&&a.papel==='pessoa').map(a=>a.pessoa_id));
+  const st={aberto:'Aberta: o time está respondendo',fechado:'Fechada: só você vê os resultados',divulgado:'Divulgada: cada pessoa vê o próprio resultado'};
+  const botoes=!c||c.status==='divulgado'?`<div class="two" style="align-items:end"><div class="field"><label for="av-nome">Nome da avaliação</label><input id="av-nome" type="text" placeholder="Ex.: Avaliação 360° · nov/2026"></div><button class="btn" id="av-abrir">Abrir avaliação para o time</button></div>`
+    :c.status==='aberto'?'<button class="btn" id="av-fechar">Fechar e ver resultados</button>'
+    :'<button class="btn" id="av-divulgar">Divulgar: cada pessoa vê o próprio resultado</button> <button class="btn sec" id="av-reabrir">Reabrir</button>';
+  const linhas=(part||[]).map(p=>`<tr><td>${esc(nome(p.id))}</td><td class="num">${p.id==='diretor'?'—':p.avaliou}</td><td class="num">${p.recebeu}${p.recebeu<3?' <span class="hint">(mín. 3)</span>':''}</td><td>${p.id==='diretor'||ativos.has(p.id)?'':'<span class="hint">sem acesso ainda</span>'}</td></tr>`).join('');
+  let resultados='';
+  if(res&&res.itens){const dir=res.itens.find(x=>x.avaliado==='diretor'),out=res.itens.filter(x=>x.avaliado!=='diretor');
+    resultados=`<div class="panel" style="margin-top:16px"><h2>Como o time avalia você</h2>${dir&&!dir.insuficiente?`<p class="hint">${dir.n} avaliações dos liderados · média geral ${f2(dir.geral)}</p>${barrasAval(dir.medias,'diretor')}${comentarios(dir)}`:`<p class="def" style="margin:0">${dir?dir.n:0} avaliação(ões): o resultado só aparece com 3 ou mais.</p>`}</div>
+      <h2 class="sec">Resultado por pessoa</h2><div class="grid g2">${out.map(x=>`<div class="panel"><h3 style="text-transform:none;font-size:15px;color:var(--ink)">${esc(nome(x.avaliado))}</h3>${x.insuficiente?`<p class="def" style="margin:0">${x.n} avaliação(ões): insuficiente.</p>`:`<p class="hint">${x.n} avaliações · média ${f2(x.geral)} · marca = média do time</p>${barrasAval(x.medias,'colega',res.time)}<details><summary class="hint">Comentários</summary>${comentarios(x)}</details>`}</div>`).join('')}</div>`}
+  el.innerHTML=`<div class="panel" style="margin-bottom:16px"><h2>Avaliação 360°</h2>
+    <p class="hint">Cada pessoa avalia os colegas com quem trabalha e avalia você como gestor. É anônimo por construção: o banco não guarda quem respondeu, nem você vê respostas individuais, e cada resultado só aparece com 3 ou mais avaliações. Só participa quem já tem acesso ao painel.</p>
+    <p style="margin:0 0 12px"><strong>${c?esc(c.nome)+' · '+st[c.status]:'Nenhuma avaliação aberta ainda.'}</strong></p>${botoes}</div>
+    ${c?`<div class="panel"><h2>Participação</h2><p class="hint">Só números: quantos colegas cada um avaliou e quantas avaliações cada um recebeu.</p><div class="scroll"><table><thead><tr><th>Pessoa</th><th>Avaliou</th><th>Recebeu</th><th></th></tr></thead><tbody>${linhas}</tbody></table></div></div>`:''}
+    ${resultados}`;
+}
+document.addEventListener('click',async e=>{
+  if(S.papel!=='admin')return;const t=e.target;
+  const ac={'av-abrir':'abrir','av-fechar':'fechar','av-divulgar':'divulgar','av-reabrir':'reabrir'}[t.id];if(!ac)return;
+  if(ac==='divulgar'&&S.avConf!=='divulgar'){S.avConf='divulgar';t.textContent='Confirmar: divulgar para todos';return}
+  S.avConf=null;t.disabled=true;
+  try{await rpcAv('aval_admin',{p_acao:ac,p_nome:ac==='abrir'?($('#av-nome')||{}).value||null:null});toast({abrir:'Avaliação aberta. O time já vê.',fechar:'Avaliação fechada.',divulgar:'Resultados divulgados.',reabrir:'Avaliação reaberta.'}[ac])}
+  catch(er){toast('Não foi possível: '+erroAmigavel(er))}
+  renderAvaliacaoAdm();
+});
+
 /* ---- 50-eventos-master.js ---- */
 /* ===== Eventos do painel do diretor ===== */
 document.addEventListener('click',async e=>{
@@ -844,12 +957,12 @@ document.addEventListener('pointermove',e=>{
 });
 
 /* ===== Render do painel ===== */
-const ABAS=['geral','acompanhamento','pessoas','agenda','roteiros','guia','clima','kpis','acessos','historico'];
+const ABAS=['geral','acompanhamento','pessoas','agenda','roteiros','guia','aval','clima','kpis','acessos','historico'];
 function render(){
   if(S.papel!=='admin')return;
   $$('#tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===S.tab)));
   ABAS.forEach(k=>$('#tab-'+k).hidden=k!==S.tab);
-  ({geral:renderGeral,acompanhamento:renderAcompanhamento,pessoas:renderPessoas,agenda:renderAgenda,roteiros:renderRoteiros,guia:renderGuia,clima:renderClima,kpis:renderKpis,acessos:renderAcessos,historico:renderHistorico})[S.tab]();
+  ({geral:renderGeral,acompanhamento:renderAcompanhamento,pessoas:renderPessoas,agenda:renderAgenda,roteiros:renderRoteiros,guia:renderGuia,aval:renderAvaliacaoAdm,clima:renderClima,kpis:renderKpis,acessos:renderAcessos,historico:renderHistorico})[S.tab]();
 }
 function onData(ts){render();if($('#ficha').open)fichaDin();if($('#previa').open&&S.previaId)abrirPrevia(S.previaId)}
 
@@ -982,7 +1095,8 @@ function descAud(r){
 function renderHistorico(){
   const f=S.audFiltro;
   const rows=S.aud.filter(r=>!f||((r.depois||r.antes||{}).pessoa_id===f));
-  $('#tab-historico').innerHTML=`<div class="panel"><h2>Histórico de mudanças</h2><p class="hint">Tudo o que foi criado, alterado ou apagado, por quem e quando. Atualiza ao vivo. Mostra as 400 mudanças mais recentes.</p>
+  $('#tab-historico').innerHTML=`<div class="panel" style="margin-bottom:16px"><h2>Backup</h2><p class="hint">O plano gratuito do Supabase não faz backup automático. Baixe um arquivo com todos os dados do painel e guarde no OneDrive (pasta Imob/RH/1a1 - Backups). Recomendado a cada 15 dias. As respostas da avaliação 360° não entram, porque são anônimas e não ficam acessíveis nem para você.</p><button class="btn" id="backup">Exportar backup completo</button>${S.ultimoBackup?` <span class="hint">Último neste navegador: ${esc(S.ultimoBackup)}</span>`:''}</div>
+  <div class="panel"><h2>Histórico de mudanças</h2><p class="hint">Tudo o que foi criado, alterado ou apagado, por quem e quando. Atualiza ao vivo. Mostra as 400 mudanças mais recentes.</p>
   <div class="field" style="max-width:320px;margin:0"><label for="aud-filtro">Filtrar por pessoa</label><select id="aud-filtro"><option value="">Todas</option>${P.map(p=>`<option value="${p.id}" ${f===p.id?'selected':''}>${esc(p.nome)}</option>`).join('')}</select></div></div>
   <div class="panel scroll"><table><thead><tr><th>Quando</th><th>Quem</th><th>O que mudou</th></tr></thead><tbody>
   ${rows.map(r=>`<tr><td style="white-space:nowrap">${fdh(r.em)}</td><td>${esc(quemFoi(r.usuario))}</td><td>${esc(descAud(r))}</td></tr>`).join('')||'<tr><td colspan="3" class="hint">Nenhuma mudança registrada ainda.</td></tr>'}
@@ -1008,9 +1122,27 @@ function abrirPrevia(pid){
   if(!d.open)d.showModal();
 }
 
+/* backup: todas as tabelas que o diretor lê, num arquivo JSON */
+async function exportarBackup(btn){
+  btn.disabled=true;const out={gerado_em:new Date().toISOString(),projeto:'painel-1a1',tabelas:{}};
+  try{
+    for(const t of ['pessoas','perfil','perfil_diretor','kpis','metas_coletivas','encontros','notas_diretor','acoes','propostas','preparacao','atualizacoes','config']){
+      const r=await S.sb.from(t).select('*');if(r.error)throw r.error;out.tabelas[t]=r.data}
+    const ac=await S.sb.from('acessos').select('email,pessoa_id,papel,ativado_em,criado_em');if(ac.error)throw ac.error;out.tabelas.acessos=ac.data;
+    const nome='backup-painel-1a1-'+hoje()+'.json';
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(out,null,1)],{type:'application/json'}));a.download=nome;document.body.appendChild(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
+    S.ultimoBackup=new Date().toLocaleString('pt-BR');try{localStorage.setItem('ultimoBackup',S.ultimoBackup)}catch(e){}
+    toast('Backup baixado: '+nome+'. Guarde no OneDrive.');renderHistorico();
+  }catch(er){toast('Não foi possível gerar o backup: '+erroAmigavel(er))}
+  btn.disabled=false;
+}
+try{S.ultimoBackup=localStorage.getItem('ultimoBackup')||''}catch(e){}
+document.addEventListener('click',e=>{if(S.papel==='admin'&&e.target.id==='backup')exportarBackup(e.target)});
+
 /* ---- 70-pessoa.js ---- */
 /* ===== Página da pessoa (também usada na pré-visualização do diretor) ===== */
-const PTABS=[['inicio','Início'],['novidades','Atualizações'],['360','Meu 360°'],['kpis','Minhas metas'],['plano','Meu plano'],['acoes','Ações e histórico'],['preparar','Preparar meu 1:1']];
+const PTABS=[['inicio','Início'],['novidades','Atualizações'],['360','Meu 360°'],['kpis','Minhas metas'],['plano','Meu plano'],['acoes','Ações e histórico'],['aval','Avaliação 360°'],['preparar','Preparar meu 1:1']];
 const CAMPOS=[['conquistas','O que eu conquistei desde o último 1:1'],['dificuldades','O que está difícil ou travando'],['preciso','O que eu preciso do Riccardo'],['assuntos','Assuntos que eu quero tratar']];
 function blocoTotais(t){
   return `<div class="grid3">${[['Empresa','50%',t.emp],['Equipe (setor)','10%',t.eq],['Resultado individual','20%',t.pf],['Comportamental','20%',t.cp],['Total','',t.tot]].map(([l,w,v])=>`<div class="stat"><div class="l">${l}${w?' · '+w:''}</div><div class="v">${pct(v)}</div></div>`).join('')}</div>`}
@@ -1028,7 +1160,7 @@ function secaoPessoa(D,tab,prev){
   if(tab==='inicio')return `<div class="panel"><h2>Olá, ${esc(nome)}</h2><p style="margin:0">Este é o seu espaço de acompanhamento. Só você e o Riccardo veem o que está aqui. Os 1:1s acontecem a cada dois meses, com 45 minutos, para olhar seus resultados, seu comportamento e o seu desenvolvimento.</p></div>
     <div class="panel"><h3>Seu próximo 1:1</h3>${pf.slot?`<div class="big">${esc(pf.slot.dl)} · ${esc(pf.slot.a)} às ${esc(pf.slot.b)}</div>${prev||S.imprimir?'':'<button class="btn sec" id="ics-meu" style="margin-top:10px">Adicionar à minha agenda (Outlook)</button>'}`:'<p class="def" style="margin:0">Horário a combinar.</p>'}</div>
     <div class="panel"><h3>Temas que vamos conversar</h3><ul class="l">${(pf.temas||[]).map(t=>`<li>${esc(t)}</li>`).join('')||'<li class="def">A definir.</li>'}</ul></div>
-    <div class="note"><strong>Como seu resultado é composto:</strong> 50% metas da empresa, 10% metas da sua equipe (setor) e 40% individual: 20% seus resultados e 20% comportamento. As metas individuais são combinadas juntas no 1:1, a partir da proposta que você traz${S.imprimir?'.':' na aba <em>Preparar meu 1:1</em>.'}</div>`;
+    <div class="note">${metasEmpresa(pf.area).length+metasEquipe(pf.area).length?'<strong>Como seu resultado é composto:</strong> 50% metas da empresa, 10% metas da sua equipe (setor) e 40% individual: 20% seus resultados e 20% comportamento. ':''}As suas metas individuais são combinadas juntas no 1:1, a partir da proposta que você traz${S.imprimir?'.':' na aba <em>Preparar meu 1:1</em>.'}</div>`;
   if(tab==='novidades'){const at=D.atualizacoes||[];
     return `<div class="panel"><h3>Tudo o que mudou na sua página</h3>${at.length?at.map(a=>`<div class="hist"><div class="d">${fdh(a.em)} · ${a.autor==='diretor'?'Riccardo':a.autor==='pessoa'?(prev?esc(nome):'Você'):'Sistema'}</div><div>${esc(a.texto)}</div></div>`).join(''):'<p class="def" style="margin:0">Nenhuma atualização ainda.</p>'}</div>
     <p class="hint">As mudanças aparecem aqui na hora, com data, hora e quem fez.</p>`}
@@ -1040,6 +1172,12 @@ function secaoPessoa(D,tab,prev){
     <p class="hint">Síntese dos comentários anônimos da pesquisa de agosto de 2026. As avaliações são confidenciais: o objetivo é o seu desenvolvimento.</p>`}
   if(tab==='kpis'){const t=totaisPk(D.kpis,(D.perfil||{}).area);
     const row=k=>`<tr><td>${esc(k.nome)}</td><td>${k.meta?esc(k.meta):'<span class="def">a definir no 1:1</span>'}</td><td style="font-family:var(--mono)">${k.ating!=null&&k.ating!==''?esc(Number(k.ating))+'%':'—'}</td><td>${D.propostas[k.k]?esc(D.propostas[k.k]):'<span class="def">—</span>'}</td></tr>`;
+    const temMetas=metasEmpresa((D.perfil||{}).area).length+metasEquipe((D.perfil||{}).area).length>0;
+    if(!temMetas)return `<div class="note">As metas da empresa e do seu setor estão sendo definidas. Quando estiverem prontas, aparecem aqui junto com a composição do seu resultado.</div>
+    <div class="panel scroll"><table><thead><tr><th>Meta</th><th>Meta combinada</th><th>Atingimento</th><th>Minha proposta</th></tr></thead><tbody>
+    <tr><td colspan="4"><strong>Meus resultados</strong></td></tr>${D.kpis.filter(k=>k.g==='perf').map(row).join('')}
+    <tr><td colspan="4"><strong>Comportamental</strong></td></tr>${D.kpis.filter(k=>k.g==='comp').map(row).join('')}</tbody></table></div>
+    <p class="hint">A meta e o atingimento são atualizados pelo Riccardo depois de cada 1:1 e aparecem aqui na hora.</p>`;
     return blocoTotais(t)+`
     <div class="panel scroll"><table><thead><tr><th>Meta</th><th>Meta combinada</th><th>Atingimento</th><th>Minha proposta</th></tr></thead><tbody>
     ${linhasColetivas((D.perfil||{}).area,4)}
@@ -1050,6 +1188,7 @@ function secaoPessoa(D,tab,prev){
     const en=(D.encontros||[]).slice().sort((a,b)=>String(b.data).localeCompare(String(a.data)));
     return `<div class="panel"><h3>Combinados</h3>${ac.length?ac.map(a=>`<label class="act ${a.feita?'done':''}"><input type="checkbox" data-feita="${esc(a.id)}" ${a.feita?'checked':''} ${dis}><span><span class="tx">${esc(a.texto)}</span>${a.prazo||a.dono?`<span class="pz">${a.prazo?'Prazo '+fdata(a.prazo):''}${a.dono?' · '+esc(a.dono):''}</span>`:''}</span></label>`).join(''):'<p class="def" style="margin:0">Nenhum combinado por enquanto.</p>'}</div>
     <div class="panel"><h3>Histórico dos 1:1s</h3>${en.length?en.map(h=>`<div class="hist"><div class="d">${fdata(h.data)}</div><div>${esc(h.resumo)}</div>${h.combinados?`<div class="hint" style="margin:4px 0 0">Combinados: ${esc(h.combinados)}</div>`:''}</div>`).join(''):'<p class="def" style="margin:0">Seu primeiro 1:1 deste ciclo ainda vai acontecer.</p>'}</div>`}
+  if(tab==='aval')return secaoAval(prev);
   if(tab==='plano')return htmlPlano(D.perfil.pdi||{},(D.acoes||[]).filter(a=>String(a.origem||'').startsWith('PDI')),dis);
   if(tab==='preparar'){const pr=D.propostas||{},pp=D.preparacao||{};
     return `<div class="panel"><h2>Preparar meu 1:1</h2><p class="hint">Escreva antes da conversa. Salva sozinho quando você sai do campo, e o Riccardo vê na hora. <strong id="salvo">${esc(S.salvoMsg||'')}</strong></p>
@@ -1076,6 +1215,7 @@ async function carregarPessoa(){
     sel('',S.sb.from('preparacao').select('*').eq('pessoa_id',pid).eq('ciclo',CICLO)),
     sel('',S.sb.from('metas_coletivas').select('*').eq('ciclo',CICLO).order('ordem').order('criado_em'))]);
   S.metas=mc;
+  await carregarAvPessoa();
   S.D={nome:(pes[0]||{}).nome||'',perfil:(perf[0]||{}).dados||{},
     kpis:kp.map(r=>({g:r.grupo,k:r.chave,nome:r.nome,meta:r.meta,ating:r.ating})),
     acoes:ac,encontros:en.map(r=>({data:r.data,resumo:r.resumo,combinados:r.combinados})),atualizacoes:at,

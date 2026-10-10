@@ -1,0 +1,19 @@
+# Pulso diário: uma consulta real ao banco para o projeto Supabase do plano gratuito não pausar por inatividade.
+# Usa só a chave pública (a mesma do config.js) e uma função que devolve verdadeiro/falso, sem dado de ninguém.
+name: pulso
+on:
+  schedule:
+    - cron: "17 11 * * *"   # todo dia, 08:17 em Brasília
+  workflow_dispatch:
+jobs:
+  pulso:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Chamar a função pulso
+        run: |
+          URL=$(grep -o "https://[a-z0-9]*\.supabase\.co" config.js | head -1)
+          KEY=$(grep -o "eyJ[A-Za-z0-9._-]*" config.js | head -1)
+          RESP=$(curl -s -o /tmp/r -w "%{http_code}" -X POST "$URL/rest/v1/rpc/pulso" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{}')
+          echo "HTTP $RESP: $(cat /tmp/r)"
+          test "$RESP" = "200"
