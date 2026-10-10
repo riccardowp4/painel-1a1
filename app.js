@@ -686,6 +686,7 @@ function renderAcompanhamento(){
   <div class="panel" style="margin-top:16px"><h2>Lista do plano de ação e melhorias</h2>
     <div class="bar"><select id="acf-sit" aria-label="Situação"><option value="">Todas as situações</option>${Object.entries(SIT).map(([k,[l]])=>`<option value="${k}" ${f.sit===k?'selected':''}>${l}</option>`).join('')}</select>
       <select id="acf-tipo" aria-label="Tipo"><option value="">Todos os tipos</option>${Object.entries(TIPO_NOME).map(([k,l])=>`<option value="${k}" ${f.tipo===k?'selected':''}>${l}</option>`).join('')}</select></div>
+    ${formNovaAcao(gente)}
     ${listaAcoes(acoes)}</div>`;
   animarAcompanhamento();
 }
@@ -716,13 +717,29 @@ function termometroTime(gente){
   if(!linhas.some(x=>x[1]))return '<p class="def" style="margin:0">Ainda sem termômetro registrado. Ele entra quando você conduz o 1:1 pela aba Roteiros e leva para o registro.</p>';
   return `<div class="scroll"><table class="tm-t"><thead><tr><th>Pessoa</th>${TERMO.map(([,l])=>`<th>${l}</th>`).join('')}</tr></thead><tbody>${linhas.map(([p,t])=>`<tr><td>${esc(p.nome)}</td>${TERMO.map(([k,l])=>{const v=t&&t[k];return `<td><span class="tc ${v?'v'+v:''}" data-tip="${esc(p.nome)} · ${l}: ${v||'sem registro'}">${v||'·'}</span></td>`}).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
+const TIPO_ORIGEM={comb:'1:1 '+CICLO.replace('c','ciclo '),'70':'PDI · 70 prática','20':'PDI · 20 pessoas','10':'PDI · 10 estudo'};
+function optsTipo(sel){return Object.entries(TIPO_ORIGEM).map(([k])=>`<option value="${k}" ${sel===k?'selected':''}>${TIPO_NOME[k]}</option>`).join('')}
+function formNovaAcao(gente){
+  const f=S.acf;
+  return `<details class="nova" ${S.acNovaAberta?'open':''}><summary class="btn sec sm">+ Nova ação</summary>
+    <div class="na-g"><div class="field"><label for="nv-p">Pessoa</label><select id="nv-p">${gente.map(p=>`<option value="${p.id}" ${f.pid===p.id?'selected':''}>${esc(p.nome)}</option>`).join('')}</select></div>
+      <div class="field" style="grid-column:span 2"><label for="nv-t">O que será feito</label><input id="nv-t" type="text" maxlength="300"></div>
+      <div class="field"><label for="nv-o">Tipo</label><select id="nv-o">${optsTipo('comb')}</select></div>
+      <div class="field"><label for="nv-z">Prazo</label><input id="nv-z" type="date"></div>
+      <div class="field"><label for="nv-d">Dono</label><select id="nv-d"><option value="pessoa">A pessoa</option><option value="Riccardo">Riccardo</option></select></div></div>
+    <button class="btn" id="nv-add">Adicionar</button></details>`;
+}
 function listaAcoes(acoes){
   const f=S.acf;let l=acoes.filter(a=>(!f.sit||situacao(a)===f.sit)&&(!f.tipo||tipoAcao(a)===f.tipo));
   const ord={atrasada:0,vence:1,emdia:2,feita:3};l.sort((a,b)=>ord[situacao(a)]-ord[situacao(b)]||String(a.prazo||'9').localeCompare(String(b.prazo||'9')));
   if(!l.length)return '<p class="def" style="margin:0">Nenhuma ação com esse filtro.</p>';
-  return `<div class="scroll"><table class="al"><thead><tr><th></th><th>Ação</th><th>Pessoa</th><th>Tipo</th><th>Prazo</th><th>Situação</th></tr></thead><tbody>${l.map(a=>{const s=situacao(a),[sl,si,sc]=SIT[s],t=tipoAcao(a);
+  return `<div class="scroll"><table class="al"><thead><tr><th></th><th>Ação</th><th>Pessoa</th><th>Tipo</th><th>Prazo</th><th>Situação</th><th></th></tr></thead><tbody>${l.map(a=>{const s=situacao(a),[sl,si,sc]=SIT[s],t=tipoAcao(a);
+    if(S.acEdit===a.id)return `<tr class="ed"><td></td><td><input id="ed-t" type="text" value="${esc(a.texto)}" maxlength="300" aria-label="Texto da ação"></td><td>${esc((PB[a.pessoa_id]||{}).nome||'')}</td>
+      <td><select id="ed-o" aria-label="Tipo">${optsTipo(t==='ant'?'comb':t)}</select></td><td><input id="ed-z" type="date" value="${a.prazo||''}" aria-label="Prazo"></td>
+      <td colspan="2" style="white-space:nowrap"><button class="btn sm" data-ac-salvar="${a.id}">Salvar</button> <button class="btn sec sm" id="ed-cancela">Cancelar</button></td></tr>`;
     return `<tr class="${s}"><td><input type="checkbox" data-acao="${a.id}" ${a.feita?'checked':''} aria-label="Concluir: ${esc(a.texto)}"></td><td>${esc(a.texto)}</td><td>${esc((PB[a.pessoa_id]||{}).nome||'')}</td>
-      <td><span class="tg" style="${TIPO_COR['PDI · '+t]?'border-color:'+TIPO_COR['PDI · '+t]:''}">${TIPO_NOME[t]}</span></td><td class="num">${a.prazo?fdata(a.prazo):'—'}</td><td><span class="stt" style="--c:${sc}">${si} ${sl}</span></td></tr>`}).join('')}</tbody></table></div>`;
+      <td><span class="tg" style="${TIPO_COR['PDI · '+t]?'border-color:'+TIPO_COR['PDI · '+t]:''}">${TIPO_NOME[t]}</span></td><td class="num">${a.prazo?fdata(a.prazo):'—'}</td><td><span class="stt" style="--c:${sc}">${si} ${sl}</span></td>
+      <td style="white-space:nowrap"><button class="ic" data-ac-ed="${a.id}" aria-label="Editar: ${esc(a.texto)}" title="Editar">✎</button><button class="ic ${S.acDel===a.id?'del':''}" data-ac-del="${a.id}" aria-label="Excluir: ${esc(a.texto)}" title="Excluir">${S.acDel===a.id?'Confirmar exclusão':'🗑'}</button></td></tr>`}).join('')}</tbody></table></div>`;
 }
 function animarAcompanhamento(){
   const M=window.Motion,chave=JSON.stringify(S.acf);
@@ -740,8 +757,27 @@ document.addEventListener('change',e=>{
   const map={'acf-area':'area','acf-pid':'pid','acf-sit':'sit','acf-tipo':'tipo'};
   if(map[t.id]){S.acf=Object.assign({},S.acf,{[map[t.id]]:t.value});if(t.id==='acf-area')S.acf.pid='';renderAcompanhamento()}
 });
-document.addEventListener('click',e=>{
+async function recarregarAcoes(msg){await CARGA.acoes();await CARGA.atualizacoes();onData();if(msg)toast(msg)}
+document.addEventListener('click',async e=>{
   if(S.papel!=='admin')return;const t=e.target;
+  if(t.closest('.nova summary')){S.acNovaAberta=!t.closest('details').open;return}
+  if(t.id==='nv-add'){const pid=$('#nv-p').value,tx=$('#nv-t').value.trim();if(!tx){toast('Escreva a ação.');return}
+    const tp=$('#nv-o').value,dono=$('#nv-d').value==='pessoa'?((PB[pid]||{}).nome||''):'Riccardo';
+    t.disabled=true;const r=await S.sb.from('acoes').insert({pessoa_id:pid,ciclo:CICLO,texto:tx,origem:TIPO_ORIGEM[tp],prazo:$('#nv-z').value||null,dono});t.disabled=false;
+    if(r.error){toast('Não foi possível salvar: '+erroAmigavel(r.error));return}
+    S.acNovaAberta=true;await recarregarAcoes('Ação adicionada. A pessoa já vê.');return}
+  const ed=t.closest('[data-ac-ed]');if(ed){S.acEdit=ed.dataset.acEd;S.acDel=null;renderAcompanhamento();const i=$('#ed-t');if(i)i.focus();return}
+  if(t.id==='ed-cancela'){S.acEdit=null;renderAcompanhamento();return}
+  const sv=t.closest('[data-ac-salvar]');if(sv){const tx=$('#ed-t').value.trim();if(!tx){toast('O texto não pode ficar vazio.');return}
+    const a=S.acoesRows[sv.dataset.acSalvar],tp=$('#ed-o').value,ant=tipoAcao(a)==='ant'&&tp==='comb';
+    const r=await S.sb.from('acoes').update({texto:tx,prazo:$('#ed-z').value||null,origem:ant?a.origem:TIPO_ORIGEM[tp]}).eq('id',sv.dataset.acSalvar);
+    if(r.error){toast('Não foi possível salvar: '+erroAmigavel(r.error));return}
+    S.acEdit=null;await recarregarAcoes('Ação atualizada.');return}
+  const dl=t.closest('[data-ac-del]');if(dl){const id=dl.dataset.acDel;
+    if(S.acDel!==id){S.acDel=id;renderAcompanhamento();return}
+    S.acDel=null;const r=await S.sb.from('acoes').delete().eq('id',id);
+    if(r.error){toast('Não foi possível excluir: '+erroAmigavel(r.error));return}
+    await recarregarAcoes('Ação excluída. Fica registrada no Histórico.');return}
   const b=t.closest('[data-acpid]');if(b){S.acf=Object.assign({},S.acf,{pid:b.dataset.acpid});renderAcompanhamento();return}
   if(t.id==='acf-limpa'){S.acf={sit:'',tipo:''};renderAcompanhamento()}
 });
