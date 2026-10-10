@@ -376,7 +376,8 @@ function slotData(sl){ // aceita {d,...} ou o rótulo "Ter 13/10"
   if(!sl)return null;if(sl.d)return sl.d;
   const m=/(\d{2})\/(\d{2})/.exec(sl.dl||'');return m?`${CICLO_ANO}-${m[2]}-${m[1]}`:null}
 const CICLO_ANO='2026';
-function emailDe(pid){const a=S.acessos.find(x=>x.pessoa_id===pid&&x.papel==='pessoa');return a?a.email:''}
+// e-mail do acesso; sem acesso ainda, o e-mail de agenda guardado na visão do diretor
+function emailDe(pid){const a=S.acessos.find(x=>x.pessoa_id===pid&&x.papel==='pessoa');return a?a.email:((PB[pid]||{}).email||'')}
 function emailDiretor(){const a=S.acessos.find(x=>x.papel==='admin');return a?a.email:''}
 function urlPainel(){return location.origin+location.pathname}
 function pautaTexto(nome){return `1:1 bimestral (45 min) com ${nome}.\n\nPauta: 5' check-in · 10' KPIs · 10' comportamental/360° · 10' PDI e carreira · 5' o que você precisa de mim · 5' combinados com dono e prazo.\n\nAntes do encontro, preencha "Preparar 1:1" no painel: ${urlPainel()}`}
@@ -446,7 +447,7 @@ function renderAcessos(){
   ${P.map(p=>{const a=porPessoa[p.id];const ativo=a&&a.user_id;
     const acao=ativo?(S.confirmaReset===p.id?`<button class="btn sm" data-reset="${p.id}" style="background:var(--crit)">Confirmar reset</button> <button class="btn sec sm" id="cancelar-reset">Cancelar</button>`:`<button class="btn sec sm" data-reset="${p.id}">Resetar acesso</button>`)
       :`<button class="btn sm" data-gerar="${p.id}">${a?'Gerar novo código':'Gerar código'}</button>`;
-    return `<tr><td>${esc(p.nome)}</td><td><input type="email" id="em-${p.id}" value="${esc(a?a.email:'')}" placeholder="e-mail da pessoa" ${ativo?'disabled':''} aria-label="E-mail de ${esc(p.nome)}"></td><td>${situ(a)}</td><td style="white-space:nowrap">${acao}</td></tr>`}).join('')}
+    return `<tr><td>${esc(p.nome)}</td><td><input type="email" id="em-${p.id}" value="${esc(a?a.email:(p.email||''))}" placeholder="e-mail da pessoa" ${ativo?'disabled':''} aria-label="E-mail de ${esc(p.nome)}"></td><td>${situ(a)}</td><td style="white-space:nowrap">${acao}</td></tr>`}).join('')}
   </tbody></table></div>`;
 }
 async function gerarCodigo(pid,btn){
