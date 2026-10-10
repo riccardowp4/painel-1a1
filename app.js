@@ -87,7 +87,7 @@ const CARGA={
   kpis:async()=>{S.kpis={};S.kpiRows={};(await sel('kpis',S.sb.from('kpis').select('*').eq('ciclo',CICLO).order('ordem'))).forEach(r=>{
     (S.kpis[r.pessoa_id]=S.kpis[r.pessoa_id]||{})[r.chave]={meta:r.meta,ating:r.ating==null?'':String(Number(r.ating))};
     (S.kpiRows[r.pessoa_id]=S.kpiRows[r.pessoa_id]||[]).push(r)})},
-  encontros:async()=>{S.uno=(await sel('encontros',S.sb.from('encontros').select('*'))).map(r=>({id:r.id,pid:r.pessoa_id,ciclo:r.ciclo,data:r.data,humor:r.humor,resumo:r.resumo,proximos:r.combinados,devolutiva:r.devolutiva}))},
+  encontros:async()=>{S.uno=(await sel('encontros',S.sb.from('encontros').select('*'))).map(r=>({id:r.id,pid:r.pessoa_id,ciclo:r.ciclo,data:r.data,humor:r.humor,resumo:r.resumo,proximos:r.combinados,devolutiva:r.devolutiva,termometro:r.termometro||null}))},
   acoes:async()=>{S.acoesRows={};(await sel('acoes',S.sb.from('acoes').select('*'))).forEach(r=>S.acoesRows[r.id]=r)},
   atualizacoes:async()=>{S.atu=await sel('atualizacoes',S.sb.from('atualizacoes').select('*').order('em',{ascending:false}).limit(2000))},
   propostas:async()=>{S.prop={};(await sel('propostas',S.sb.from('propostas').select('*').eq('ciclo',CICLO))).forEach(r=>{(S.prop[r.pessoa_id]=S.prop[r.pessoa_id]||{})[r.chave]={texto:r.texto,em:r.atualizado_em}})},
@@ -255,7 +255,7 @@ function ficha(id){
    <div class="panel"><h3>O que o 360° diz (ago/2026)</h3><p style="margin:0 0 8px"><strong>Pontos fortes:</strong> ${esc(p.fortesTxt||'')}</p>${(p.melhTxt||[]).length?`<p style="margin:0 0 4px"><strong>Pontos de melhoria (${p.melh}):</strong></p><ul>${p.melhTxt.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p style="margin:0"><strong>Pontos de melhoria:</strong> nenhum registrado.</p>'}<p class="hint" style="margin:8px 0 0">Síntese dos comentários anônimos. O 360° é confidencial: não cite avaliadores. Esta parte só você vê.</p></div>
    <div class="panel"><h3>O que a pessoa escreveu para o 1:1</h3><div id="fi-pessoa"></div></div>
    <div class="panel"><h3>Último 1:1 antes do ciclo</h3>${p.ultimo?`<p style="margin:0 0 4px"><strong>${esc(p.ultimo.data)}</strong> · <span class="hint">${esc(p.ultimo.fonte||'')}</span></p><p style="margin:0">${esc(p.ultimo.resumo)}</p>`:`<p class="hint" style="margin:0">Sem registro anterior.${p.obs?' '+esc(p.obs):''}</p>`}</div>
-   <div class="panel"><h3>Roteiro do 1:1 · 45 min</h3><p class="hint" style="margin:0 0 8px">Estrutura do 1:1 da Katia, preenchida para ${esc(p.nome.split(' ')[0])} (${TIPO_ROT[roteiro(p).tipo]}).</p>${htmlRoteiro(p)}</div>
+   <div class="panel"><h3>Roteiro do 1:1 · 45 min</h3><p class="hint" style="margin:0 0 8px">7 blocos, preenchidos para ${esc(p.nome.split(' ')[0])} (${TIPO_ROT[roteiro(p).tipo]}). Use "Conduzir este 1:1" durante a reunião.</p>${htmlRoteiro(p)}</div>
    <div class="panel"><h3>KPIs do ciclo</h3><p class="hint">Salva ao sair do campo. A pessoa vê a meta e o atingimento na hora.</p>
      <div class="tot"><div><div class="l">Empresa (50%)</div><div class="v" id="t-emp">${pct(t.emp)}</div></div><div><div class="l">Equipe (10%)</div><div class="v" id="t-eq">${pct(t.eq)}</div></div><div><div class="l">Individual (20%)</div><div class="v" id="t-pf">${pct(t.pf)}</div></div><div><div class="l">Comportamental (20%)</div><div class="v" id="t-cp">${pct(t.cp)}</div></div><div><div class="l">Total</div><div class="v" id="t-tot">${pct(t.tot)}</div></div></div>
      <div class="scroll"><table><thead><tr><th>KPI</th><th>Meta (definida com a pessoa)</th><th>Atingimento %</th></tr></thead><tbody>
@@ -334,90 +334,166 @@ async function salvarKpi(p,chave,grupo,campo,valor){
 }
 
 /* ---- 45-roteiro.js ---- */
-/* ===== Roteiro do 1:1 no formato do 1:1 da Katia (10/02/2026) =====
-   1. Objetivos · 2. Pontos de discussão (momento atual, processos e eficiência, visão estratégica)
-   3. Ações definidas · 4. Feedback e observações · 5. Próximos passos · registro.
-   Nada pessoal é pré-preenchido: as perguntas pessoais são só convites; o que a pessoa contar vai na nota privada. */
+/* ===== Roteiro do 1:1 em 7 blocos e modo de condução interativo =====
+   Blocos definidos por Riccardo (10/10/2026), a partir do 1:1 da Katia:
+   1 momento atual · 2 expectativas com a empresa · 3 aspiração profissional · 4 desafios e pontos de melhoria (com o clima)
+   5 processo, rotina e gestão de tempo · 6 plano de ação de melhorias · 7 feedback.
+   Nada pessoal vem preenchido; anotações da reunião ficam como rascunho só neste navegador até irem para o registro. */
 const ESTRUTURA=[
-  ['obj',3,'1. Objetivos da reunião'],
-  ['atual',7,'2a. Momento atual: profissional e pessoal'],
-  ['proc',12,'2b. Processos e eficiência: metas da empresa (50%), da equipe (10%) e individuais (20%)'],
-  ['visao',8,'2c. Visão estratégica: carreira e plano de desenvolvimento (GROW e 70-20-10)'],
-  ['fb',7,'4. Feedback e observações: comportamental e 360° (20%), com SBI'],
-  ['acoes',5,'3. Ações definidas'],
-  ['prox',3,'5. Próximos passos']];
-const ACOMPANHAR=[
-  ['Energia e motivação','Como chegou (1 a 5) e se mudou desde o último 1:1.'],
-  ['Carga de trabalho','Está dando conta no horário? O que pode sair, ser delegado ou automatizado?'],
-  ['Risco de saída','Sinais de desânimo, proposta externa, pedido de mudança. O que a faz querer ficar?'],
-  ['Relacionamento com o time','Atritos que viraram pessoais, com quem precisa alinhar.'],
-  ['Desenvolvimento','Curso, leitura ou projeto em andamento e o que já aplicou.'],
-  ['Reconhecimento','Quando foi a última vez que recebeu um reconhecimento específico.'],
-  ['Momento de vida','Só o que a pessoa quiser contar e que afete agenda, foco ou flexibilidade. Registrar só na nota privada.']];
+  ['atual',6,'Momento atual','Como a pessoa está, com perguntas concretas em vez de "como você está?"'],
+  ['expect',5,'Expectativas com a empresa','O que espera da União e de você.'],
+  ['aspira',6,'Aspiração profissional','Onde quer chegar e o caminho (GROW).'],
+  ['desafios',7,'Desafios e pontos de melhoria','Obstáculos, clima e 360°.'],
+  ['rotina',8,'Processo, rotina e gestão de tempo','Como o trabalho acontece e as metas.'],
+  ['plano',7,'Plano de ação de melhorias','Combinados e plano 70-20-10.'],
+  ['fb',6,'Feedback','Nos dois sentidos, com SBI.']];
+const TERMO=[['energia','Energia'],['carga','Carga de trabalho'],['time','Relação com o time'],['motiv','Motivação com o trabalho'],['fora','Vida fora do trabalho']];
+const TERMO_ESC=['','muito baixo','baixo','ok','bom','ótimo'];
 function perfilRot(p){
   const r=risco(p);
   if(/novo|entrou|recém/i.test((p.obs||'')+(p.motivo||''))||p.id==='paulo')return 'novo';
-  if(r==='novo')return 'regular';
   if(/estagi/i.test(p.cargo||''))return 'estagio';
   if(r==='atencao')return 'atencao';
+  if(r==='novo')return 'regular';
   if(!p.melh)return 'referencia';
   return 'regular';
+}
+const TIPO_ROT={novo:'Recém-chegado',estagio:'Estágio',atencao:'Pede atenção',referencia:'Referência',regular:'Em desenvolvimento'};
+function climaDaArea(p){
+  const baixos=(CLIMA||[]).filter(c=>c[1]<4.1);
+  const daArea=baixos.filter(c=>(p.area==='Locação'&&/contrat/i.test(c[0]))||(p.area==='Financeiro'&&/comiss|pagament/i.test(c[0]+' '+(c[3]||''))));
+  return [...daArea,...baixos.filter(c=>!daArea.includes(c))].slice(0,3);
 }
 function roteiro(p){
   const tipo=perfilRot(p),nome=p.nome.split(' ')[0];
   const pz=t=>(p.pauta||[]).filter(x=>x[0]===t).map(x=>x[1]);
   const pend=acoesDe(p).filter(a=>!a.done);
-  const kpis=perfList(p).slice(0,4);
-  const S1={
-    novo:['Primeiro 1:1 estruturado: entender como está a chegada e o que ainda falta para fazer bem o trabalho.','Combinar metas e métricas desde o início (linha de base do ciclo 1).','Traçar a rota individual: onde está, onde quer chegar.'],
-    estagio:['Alinhar como está o estágio e o que é preciso para a efetivação.','Combinar metas e métricas do ciclo (empresa 50%, equipe 10%, individual 20%, comportamental 20%).','Definir o plano de aprendizado até o fim do estágio.'],
-    atencao:['Devolver o que mudou desde o último 1:1 e o que o 360° mostrou.','Combinar metas e métricas dos KPIs (empresa 50%, equipe 10%, individual 20%, comportamental 20%).','Fechar um plano de ação curto para os pontos de atenção.'],
-    referencia:['Reconhecer o resultado do 360° (sem críticas) de forma específica.','Combinar metas e métricas do ciclo.','Discutir novo desafio, projeto ou papel de referência para o time.'],
-    regular:['Primeiro 1:1 do ciclo: entender o momento e as expectativas.','Combinar metas e métricas dos KPIs (empresa 50%, equipe 10%, individual 20%, comportamental 20%).','Traçar ou revisar a rota individual de desenvolvimento.']}[tipo];
-  if(p.ultimo)S1.unshift(`Retomar o 1:1 de ${p.ultimo.data}: o que foi entregue e o que travou.`);
-  const atual=['Como você está? O que mudou desde a última conversa (no trabalho e, se quiser contar, fora dele)?','O que te motiva a vir trabalhar hoje? E o que mais te desgasta?','Precisa de alguma flexibilidade de agenda neste período?','Por que você continua aqui? Quando foi a última vez que pensou em sair, e por quê?'];
-  if(tipo==='novo')atual.push('Como está sendo a adaptação: pessoas, sistemas, acessos, o que ninguém te explicou?');
-  if(tipo==='estagio')atual.push('Como está conciliando estágio e estudos? Previsão de formatura?');
-  const qa=perguntasArea(p)||{perguntas:[],trilhas:[]};
-  const proc=[...pz('kpi'),'Mostrar as metas da empresa e da equipe e onde a pessoa contribui para elas.',...qa.perguntas.slice(0,2),`KPIs da área para definir meta com ${nome}: ${kpis.join('; ')}.`,'Qual é a rotina da semana? A agenda está bloqueada para o trabalho de foco (como a da Katia)?','O que é retrabalho ou interrupção hoje e como cortar.'];
-  const visao=[...pz('pdi'),...qa.perguntas.slice(2,4),...(qa.trilhas.length?['Trilhas possíveis na área: '+qa.trilhas.join(', ')+'.']:[]),'Montar o plano 70-20-10: um desafio na prática, uma pessoa para aprender junto, um estudo.','Onde você está e onde quer chegar em 1 ano? Gestão, especialista ou outra área?','Qual especialização ou curso faria diferença agora? A empresa pode apoiar.'];
-  if(tipo==='referencia')visao.push('Topa ser referência ou mentor em algum tema para o time?');
-  const fb=[];
-  if(p.fortesTxt)fb.push('Reconhecer: '+p.fortesTxt);
-  (p.melhTxt||[]).forEach(x=>fb.push('Trabalhar: '+x));
-  pz('comp').forEach(x=>fb.push(x));
-  fb.push('Usar SBI: situação, comportamento e impacto. Depois perguntar como a pessoa vê.','Mentalidade de dono: trazer ideia que evita problema ou reduz custo, não só apagar incêndio.');
-  fb.push('Lembrete: 360° é confidencial. Fale do comportamento, nunca de quem avaliou.');
-  const acoes=[...pend.map(a=>`Confirmar: ${a.tx}${a.pz?' (prazo '+a.pz+')':''}`),'Fechar no máximo 3 combinados, cada um com dono e prazo, e o que você (Riccardo) faz pela pessoa até o próximo 1:1.'];
-  const prox=['A pessoa traz a rota escrita (onde está, onde quer chegar, especialização) em até 15 dias, pelo "Preparar 1:1" do painel.','Registrar o 1:1 no painel logo depois. A pessoa vê o resumo e os combinados; o pessoal fica só na nota privada.','Fechar com: "O que foi mais útil hoje? O que eu posso fazer diferente?"','Próximo 1:1: ciclo 2, a partir de 15/12/2026.'];
-  return {tipo,secoes:{obj:S1,atual,proc,visao,fb,acoes,prox}};
+  const qa=perguntasArea(p)||{perguntas:[],trilhas:[],medir:[]};
+  const pdi=(S.perfil[p.id]||{}).pdi||{};
+  const B={};
+  B.atual={ctx:[...(p.ultimo?[`Último 1:1 (${p.ultimo.data}): ${p.ultimo.resumo}`]:['Sem 1:1 registrado antes deste ciclo.'])],
+    q:['Pense nas últimas 4 semanas: qual foi o melhor momento no trabalho? E o pior?','O que mais ocupou o seu tempo? Era o que deveria ocupar?','No termômetro de 1 a 5: o que puxaria cada nota para cima?','O que mudou desde a nossa última conversa?','Tem algo fora do trabalho pesando ou ajudando que eu deva saber para te apoiar? Só se quiser contar.',
+      ...(tipo==='novo'?['Como está a adaptação: pessoas, sistemas, acessos, o que ninguém te explicou?']:[]),
+      ...(tipo==='estagio'?['Como está conciliando estágio e faculdade?']:[])]};
+  B.expect={ctx:[],q:['O que você espera da União nos próximos 12 meses?','E o que espera de mim como gestor?','O que faria você se sentir reconhecido(a) aqui?','Por que você continua aqui? Quando foi a última vez que pensou em sair, e por quê?','Tem algo que a empresa prometeu e ainda não cumpriu?']};
+  B.aspira={ctx:[...(pdi.quer?['No plano: quer chegar a '+pdi.quer]:[]),...(qa.trilhas.length?['Trilhas da área: '+qa.trilhas.join(', ')+'.']:[])],
+    q:['Onde você quer estar em 1 a 2 anos?','Gestão de pessoas, especialista ou outra área? Por quê?','O que você já faz bem para chegar lá? O que falta?','Que especialização ou estudo faria mais diferença agora?',...pz('pdi'),...(tipo==='referencia'?['Topa ser referência ou mentor em algum tema para o time?']:[])]};
+  const cl=climaDaArea(p);
+  B.desafios={ctx:[...(p.melhTxt||[]).map(x=>'360°: '+x),...cl.map(c=>`Clima de ago/26: ${c[0]} (${f2(c[1])})`)],
+    q:['Qual é o maior obstáculo hoje para você entregar mais?','O que na empresa atrapalha o seu trabalho e não depende de você?',...cl.map(c=>`No clima, "${c[0]}" teve ${f2(c[1])}. Como você vê isso na sua área?`),'Se você fosse o dono, o que mudaria primeiro?']};
+  B.rotina={ctx:[`Metas individuais da área: ${perfList(p).slice(0,4).join('; ')}.`,...(metasEmpresa(p.area).length||metasEquipe(p.area).length?['Metas coletivas: '+[...metasEmpresa(p.area),...metasEquipe(p.area)].map(m=>m.nome).join('; ')+'.']:['Metas da empresa e do setor ainda não cadastradas.'])],
+    q:['Como é a sua semana típica? Mostre a agenda.','Quanto do seu tempo vai para interrupções? Quem interrompe e por quê?','A agenda tem horário bloqueado para o trabalho de foco, como a da Katia?',...qa.perguntas.slice(0,3),...pz('kpi')]};
+  B.plano={ctx:pend.map(a=>`Aberto: ${a.tx}${a.pz?' (prazo '+a.pz+')':''}`),
+    q:[...(pend.length?['Confirmar as ações abertas: o que foi entregue, o que travou?']:[]),'Qual melhoria você implanta até o próximo 1:1?','70: que desafio prático no trabalho vai te desenvolver?','20: com quem você pode aprender (mentoria, acompanhar alguém)?','10: que curso ou estudo entra no plano?','Fechar no máximo 3 combinados, com dono e prazo. O que eu faço por você até o próximo 1:1?']};
+  B.fb={ctx:[...(p.fortesTxt?['Fortes no 360°: '+p.fortesTxt]:[]),...pz('comp').map(x=>'Comportamental: '+x)],
+    q:['Reconhecer algo específico: situação, comportamento e impacto.',...((p.melhTxt||[]).length?['Um ponto de melhoria com SBI e depois perguntar como a pessoa vê.']:[]),'O que eu posso fazer diferente como seu gestor?','O que foi mais útil nesta conversa?']};
+  return {tipo,blocos:B};
 }
-const TIPO_ROT={novo:'Recém-chegado',estagio:'Estágio',atencao:'Pede atenção',referencia:'Referência',regular:'Em desenvolvimento'};
-function htmlRoteiro(p,{compacto}={}){
+/* rascunho da reunião: só neste navegador */
+const rdKey=pid=>'rot:'+CICLO+':'+pid;
+function rd(pid){try{return JSON.parse(localStorage.getItem(rdKey(pid))||'{}')}catch(e){return {}}}
+function rdSalvar(pid,d){try{localStorage.setItem(rdKey(pid),JSON.stringify(d))}catch(e){}}
+function progresso(pid){const d=rd(pid),p=PB[pid];if(!p)return 0;const r=roteiro(p);let tot=0,ok=0;
+  ESTRUTURA.forEach(([k])=>{r.blocos[k].q.forEach((_,i)=>{tot++;if((d.checks||{})[k+i])ok++})});return tot?Math.round(100*ok/tot):0}
+/* versão compacta para a ficha */
+function htmlRoteiro(p){
   const r=roteiro(p);
-  const sec=ESTRUTURA.map(([k,m,t])=>`<li><span class="min">${m}'</span><span><span class="tt">${t}</span><ul class="dd" style="padding-left:16px;margin:2px 0 0">${r.secoes[k].map(x=>`<li>${esc(x)}</li>`).join('')}</ul></span></li>`).join('');
-  const ac=ACOMPANHAR.map(([t,d])=>`<li><strong>${t}:</strong> ${esc(d)}</li>`).join('');
-  return `<ul class="pauta">${sec}</ul>
-    <details ${compacto?'':'open'} style="margin-top:10px"><summary><strong>Para acompanhar a cada 1:1 (profissional e pessoal)</strong></summary><ul class="l" style="margin-top:6px">${ac}</ul></details>`;
+  return `<ol class="rot-mini">${ESTRUTURA.map(([k,m,t])=>`<li><span class="min">${m}'</span><span><strong>${t}</strong><span class="dd">${esc(r.blocos[k].q[0]||'')}</span></span></li>`).join('')}</ol>
+    <button class="btn" data-conduzir="${p.id}" style="margin-top:10px">Conduzir este 1:1</button>`;
 }
 function textoEstrutura(){
-  return {res:'Objetivos:\n\nMomento atual:\n\nProcessos e eficiência (KPIs):\n\nVisão estratégica (carreira):\n\nFeedback e observações:\n',
-          prox:'Ações definidas (dono e prazo):\n- \n\nPróximos passos:\n'};
+  return {res:ESTRUTURA.filter(([k])=>k!=='plano').map(([,,t])=>t+':\n').join('\n'),prox:'Plano de ação (dono e prazo):\n- \n'};
 }
+/* ---- tela ---- */
 function renderRoteiros(){
-  const ord=[...P].sort((a,b)=>String(slotDe(a)).localeCompare(String(slotDe(b))));
-  $('#tab-roteiros').innerHTML=`<div class="panel"><h2>Roteiros do ciclo 1</h2>
-    <p class="hint" style="margin:0 0 10px">Mesma estrutura do 1:1 da Katia de 10/02, em 45 minutos, com as perguntas da área de cada pessoa. O passo a passo e os métodos estão na aba Guia. O conteúdo de cada pessoa vem do 360°, do último 1:1, das ações abertas e dos KPIs da área. Nada pessoal vem preenchido: as perguntas pessoais são convites, e o que a pessoa contar fica só na sua nota privada.</p>
-    <button class="btn" id="rot-pdf">Exportar PDF</button></div>
-    ${ord.map((p,i)=>{const s=SLOT_BY_ID[slotDe(p)];return `<div class="panel rot" style="${i?'break-before:page':''}"><h2 style="margin-bottom:2px">${esc(p.nome)}</h2>
-      <p class="hint" style="margin:0 0 10px">${esc(p.cargo||p.area||'')} · ${s?esc(s.dl)+' · '+s.a+' às '+s.b:'sem horário'} · ${TIPO_ROT[roteiro(p).tipo]} · 360° ${f2(p.m)}</p>${htmlRoteiro(p,{compacto:true})}</div>`}).join('')}`;
+  const el=$('#tab-roteiros');
+  if(S.rotPrint){el.innerHTML=htmlImpressao();return}
+  if(!S.rot||!PB[S.rot.pid]){el.innerHTML=htmlGradeRot();return}
+  el.innerHTML=htmlConducao(PB[S.rot.pid],S.rot.etapa||0);
+  tickTimer();
 }
-addEventListener('beforeprint',()=>{if(S.papel==='admin')$$('#tab-roteiros details').forEach(d=>d.open=true)});
+function htmlGradeRot(){
+  const ord=[...P].sort((a,b)=>String(slotDe(a)).localeCompare(String(slotDe(b))));
+  return `<div class="panel" style="margin-bottom:14px"><h2>Conduzir os 1:1s do ciclo 1</h2><p class="hint" style="margin:0 0 10px">Escolha a pessoa para abrir o roteiro em 7 blocos, com cronômetro, termômetro do momento atual, perguntas para marcar e espaço para anotar. No fim, as anotações vão para o registro do 1:1. Quem quiser o passo a passo completo e os métodos encontra na aba Guia.</p>
+    <button class="btn sec" id="rot-pdf">Exportar todos em PDF</button></div>
+    <div class="rg">${ord.map(p=>{const s=SLOT_BY_ID[slotDe(p)],pr=progresso(p.id),t=perfilRot(p);
+      return `<button class="rc" data-conduzir="${p.id}"><span class="h"><span class="av" aria-hidden="true">${esc(ini(p.nome))}</span><span style="min-width:0"><span class="nm">${esc(p.nome)}</span><span class="cg">${esc(p.cargo||p.area||'')}</span></span></span>
+        <span class="tp t-${t}">${TIPO_ROT[t]}</span>
+        <span class="sl">${s?esc(s.dl)+' · '+s.a:'sem horário'}${feito(p.id)?' · <span class="ok">✓ registrado</span>':''}</span>
+        <span class="pb" role="progressbar" aria-valuenow="${pr}" aria-valuemin="0" aria-valuemax="100" aria-label="Roteiro percorrido"><i style="width:${pr}%"></i></span></button>`}).join('')}</div>`;
+}
+function htmlConducao(p,et){
+  const r=roteiro(p),d=rd(p.id),[k,m,t,sub]=ESTRUTURA[et],b=r.blocos[k];
+  const acum=ESTRUTURA.slice(0,et+1).reduce((s,x)=>s+x[1],0);
+  const steps=ESTRUTURA.map(([kk,mm,tt],i)=>{const tem=b&&(Object.keys(d.checks||{}).some(c=>c.startsWith(kk))||(d.notas||{})[kk]);
+    return `<button class="st ${i===et?'on':''} ${tem?'feito':''}" data-etapa="${i}" aria-current="${i===et}"><span class="n">${i+1}</span><span class="tt">${tt}</span><span class="mm">${mm}'</span></button>`}).join('');
+  const termo=k==='atual'?`<div class="termo"><div class="l">Termômetro (1 a 5)</div>${TERMO.map(([tk,tl])=>`<div class="tr"><span>${tl}</span><span class="esc">${[1,2,3,4,5].map(n=>`<button data-termo="${tk}" data-v="${n}" class="${(d.termo||{})[tk]==n?'on v'+n:''}" aria-label="${tl}: ${n}, ${TERMO_ESC[n]}" title="${TERMO_ESC[n]}">${n}</button>`).join('')}</span></div>`).join('')}</div>`:'';
+  return `<div class="cond">
+    <div class="cond-top"><button class="btn sec sm" id="rot-voltar">← Todos</button>
+      <div class="who"><span class="av" aria-hidden="true">${esc(ini(p.nome))}</span><div><div class="nm">${esc(p.nome)}</div><div class="cg">${esc(p.cargo||'')} · ${TIPO_ROT[r.tipo]} · 360° ${f2(p.m)}</div></div></div>
+      <div class="timer"><span id="rot-tempo" class="tm">00:00</span><span class="hint" style="margin:0">de 45:00 · bloco até ${acum}'</span>
+        <button class="btn sm" id="rot-play">${d.rodando?'Pausar':'Iniciar'}</button></div></div>
+    <div class="steps">${steps}</div>
+    <div class="panel blk"><div class="blk-h"><span class="n">${et+1}</span><div><h2 style="margin:0">${t}</h2><p class="hint" style="margin:2px 0 0">${sub} · ${m} min</p></div></div>
+      ${b.ctx.length?`<div class="ctx"><div class="l">Para ter em mente</div><ul>${b.ctx.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:''}
+      ${termo}
+      <div class="ql">${b.q.map((q,i)=>`<label class="qi ${(d.checks||{})[k+i]?'on':''}"><input type="checkbox" data-rq="${k+i}" ${(d.checks||{})[k+i]?'checked':''}><span>${esc(q)}</span></label>`).join('')}</div>
+      <div class="field" style="margin-top:12px"><label for="rn-${k}">Anotações deste bloco ${k==='atual'?'(o que for pessoal vai para a nota privada)':''}</label><textarea id="rn-${k}" data-rn="${k}" rows="4" placeholder="O que a pessoa disse, números, combinados">${esc((d.notas||{})[k]||'')}</textarea></div>
+      <div class="nav2"><button class="btn sec" data-etapa="${Math.max(0,et-1)}" ${et===0?'disabled':''}>← Anterior</button>
+        ${et<ESTRUTURA.length-1?`<button class="btn" data-etapa="${et+1}">Próximo: ${ESTRUTURA[et+1][2]} →</button>`:`<button class="btn" id="rot-registrar">Levar para o registro do 1:1</button>`}</div></div>
+    <p class="hint">As marcações e anotações ficam salvas só neste navegador até você levar para o registro. <button class="lnk" id="rot-limpar">Limpar rascunho</button></p></div>`;
+}
+function htmlImpressao(){
+  const ord=[...P].sort((a,b)=>String(slotDe(a)).localeCompare(String(slotDe(b))));
+  return ord.map((p,i)=>{const r=roteiro(p),s=SLOT_BY_ID[slotDe(p)];
+    return `<div class="panel rot" style="${i?'break-before:page':''}"><h2 style="margin-bottom:2px">${esc(p.nome)}</h2><p class="hint">${esc(p.cargo||'')} · ${s?esc(s.dl)+' · '+s.a+' às '+s.b:''} · ${TIPO_ROT[r.tipo]}</p>
+      ${ESTRUTURA.map(([k,m,t],j)=>`<h3 style="margin-top:12px">${j+1}. ${t} · ${m} min</h3>${r.blocos[k].ctx.length?`<p class="hint" style="margin:0 0 4px">${r.blocos[k].ctx.map(esc).join(' · ')}</p>`:''}<ul class="l">${r.blocos[k].q.map(q=>`<li>${esc(q)}</li>`).join('')}</ul>`).join('')}</div>`}).join('');
+}
+function fmtT(ms){const s=Math.floor(ms/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
+function decorrido(d){return (d.acum||0)+(d.rodando&&d.inicio?Date.now()-d.inicio:0)}
+function tickTimer(){
+  clearInterval(S.rotTimer);
+  const upd=()=>{const el=$('#rot-tempo');if(!el||!S.rot){clearInterval(S.rotTimer);return}
+    const d=rd(S.rot.pid),ms=decorrido(d),lim=ESTRUTURA.slice(0,(S.rot.etapa||0)+1).reduce((s,x)=>s+x[1],0)*60000;
+    el.textContent=fmtT(ms);el.className='tm'+(ms>45*60000?' over':ms>lim?' late':'')};
+  upd();S.rotTimer=setInterval(upd,1000);
+}
+function levarRegistro(pid){
+  const d=rd(pid),n=d.notas||{};
+  const res=ESTRUTURA.filter(([k])=>k!=='plano'&&n[k]).map(([k,,t])=>t+':\n'+n[k].trim()).join('\n\n');
+  const vals=Object.values(d.termo||{}).map(Number).filter(Boolean);
+  const termoTxt=Object.entries(d.termo||{}).map(([k,v])=>`${(TERMO.find(x=>x[0]===k)||[k,k])[1]} ${v}/5`).join(', ');
+  S.termoPend=Object.keys(d.termo||{}).length?{pid,termo:d.termo}:null;
+  ficha(pid);
+  $('#f-res').value=res+(termoTxt?`\n\nTermômetro: ${termoTxt}.`:'');
+  $('#f-prox').value=(n.plano||'').trim();
+  if(vals.length)$('#f-humor').value=String(Math.round(vals.reduce((a,b)=>a+b,0)/vals.length));
+  $('#f-res').scrollIntoView({block:'center'});
+  toast('Anotações levadas para o registro. Revise e salve. O que for pessoal, mova para a nota privada.');
+}
+addEventListener('beforeprint',()=>{if(S.papel==='admin'&&S.tab==='roteiros'&&!S.rot){S.rotPrint=true;renderRoteiros()}});
+addEventListener('afterprint',()=>{if(S.rotPrint){S.rotPrint=false;renderRoteiros()}});
 document.addEventListener('click',e=>{
   if(S.papel!=='admin')return;
   const t=e.target;
   if(t.id==='rot-pdf'){window.print();return}
+  const c=t.closest('[data-conduzir]');if(c){S.rot={pid:c.dataset.conduzir,etapa:0};if($('#ficha').open)$('#ficha').close();S.tab='roteiros';render();window.scrollTo(0,0);return}
+  if(t.id==='rot-voltar'){S.rot=null;clearInterval(S.rotTimer);renderRoteiros();return}
+  const st=t.closest('[data-etapa]');if(st&&S.rot){S.rot.etapa=Number(st.dataset.etapa);renderRoteiros();$('#tab-roteiros').scrollIntoView({block:'start'});return}
+  const tm=t.closest('[data-termo]');if(tm&&S.rot){const d=rd(S.rot.pid);d.termo=Object.assign({},d.termo,{[tm.dataset.termo]:Number(tm.dataset.v)});rdSalvar(S.rot.pid,d);renderRoteiros();return}
+  if(t.id==='rot-play'&&S.rot){const d=rd(S.rot.pid);if(d.rodando){d.acum=decorrido(d);d.rodando=false}else{d.inicio=Date.now();d.rodando=true}rdSalvar(S.rot.pid,d);renderRoteiros();return}
+  if(t.id==='rot-limpar'&&S.rot){try{localStorage.removeItem(rdKey(S.rot.pid))}catch(er){}renderRoteiros();toast('Rascunho limpo.');return}
+  if(t.id==='rot-registrar'&&S.rot){const d=rd(S.rot.pid);if(d.rodando){d.acum=decorrido(d);d.rodando=false;rdSalvar(S.rot.pid,d)}levarRegistro(S.rot.pid);return}
   if(t.id==='f-estrutura'){const x=textoEstrutura();if(!$('#f-res').value.trim())$('#f-res').value=x.res;if(!$('#f-prox').value.trim())$('#f-prox').value=x.prox;$('#f-res').focus();return}
+});
+document.addEventListener('change',e=>{
+  if(S.papel!=='admin'||!S.rot)return;const t=e.target;
+  if(t.dataset&&t.dataset.rq){const d=rd(S.rot.pid);d.checks=Object.assign({},d.checks,{[t.dataset.rq]:t.checked});rdSalvar(S.rot.pid,d);t.closest('.qi').classList.toggle('on',t.checked);
+    const k=ESTRUTURA[S.rot.etapa][0];const b=$(`.st[data-etapa="${S.rot.etapa}"]`);if(b)b.classList.add('feito');}
+});
+document.addEventListener('input',e=>{
+  if(S.papel!=='admin'||!S.rot)return;const t=e.target;
+  if(t.dataset&&t.dataset.rn){const d=rd(S.rot.pid);d.notas=Object.assign({},d.notas,{[t.dataset.rn]:t.value});rdSalvar(S.rot.pid,d)}
 });
 
 /* ---- 46-pdi.js ---- */
@@ -495,35 +571,38 @@ const GUIA=[
     'Diga que vai gravar com os óculos, para quê (registrar e montar o plano de desenvolvimento) e que só você acessa. Peça o ok. Se a pessoa não quiser, não grave e anote depois.',
     'Deixe claro que o 1:1 é dela: "este tempo é seu; o que você quer garantir que a gente fale hoje?" (Grove: o 1:1 é a reunião do liderado).',
     'Evite assuntos médicos ou disciplinares na gravação. Se surgirem, pare a gravação ou registre só o essencial.']],
-  ['1. Objetivos e devolutiva (3 min)',[
-    'Comece devolvendo o que mudou desde a última conversa. "Opiniões levadas em consideração" foi a pior nota de liderança do clima (3,74); a devolutiva é o que move essa nota.',
-    'Combine os 3 objetivos do encontro, como no 1:1 da Katia.']],
-  ['2a. Momento atual: profissional e pessoal (7 min)',[
-    'Perguntas abertas e escuta de 80% do tempo (Finnegan). Não resolva ainda, só entenda.',
-    '"Como você está? O que mudou desde a última conversa, no trabalho e fora dele, se quiser contar?"',
-    '"O que você mais gosta de fazer aqui no dia a dia? E o que mais te desgasta?"',
-    '"Por que você continua aqui? Quando foi a última vez que pensou em sair, e por quê?" (stay interview)',
-    '"Precisa de alguma flexibilidade neste período?" Tudo o que for pessoal vai só para a nota privada.']],
-  ['2b. Processos e eficiência: resultados (12 min)',[
-    'Repasse as metas: empresa (50%), equipe (10%) e individuais (20%). Mostre onde ela contribui para as coletivas.',
-    'Para cada meta individual, feche número e prazo (SMART): específica, mensurável, combinada, realista e com data.',
-    'Peça a rotina da semana. O modelo é o da Katia: agenda bloqueada no Teams para trabalho de foco, horário de interrupção definido, prioridades combinadas com você.',
-    'Use as perguntas da área da pessoa (banco abaixo).']],
-  ['2c. Visão estratégica e carreira (8 min), com GROW',[
-    'G (objetivo): "Onde você quer estar em 1 a 2 anos? Gestão, especialista, outra área?"',
+  ['Antes do bloco 1: devolutiva (1 min)',[
+    'Comece devolvendo o que mudou desde a última conversa. "Opiniões levadas em consideração" foi a pior nota de liderança do clima (3,74), e a devolutiva é o que move essa nota.']],
+  ['1. Momento atual (6 min): concreto, não subjetivo',[
+    '"Como você está?" é vago e gera "tudo bem". Troque por perguntas com tempo e exemplo: "Nas últimas 4 semanas, qual foi o melhor momento no trabalho? E o pior?"',
+    'Use o termômetro de 1 a 5 (energia, carga de trabalho, relação com o time, motivação e vida fora do trabalho). Número abre conversa: "o que faria esse 3 virar 4?"',
+    '"O que mais ocupou o seu tempo? Era o que deveria?"',
+    'Pessoal, só se a pessoa quiser contar, e só na nota privada. Escute 80% do tempo (Finnegan).']],
+  ['2. Expectativas com a empresa (5 min)',[
+    '"O que você espera da União nos próximos 12 meses? E de mim?"',
+    '"O que faria você se sentir reconhecido aqui?"',
+    'Retenção (stay interview): "Por que você continua aqui? Quando foi a última vez que pensou em sair, e por quê?"']],
+  ['3. Aspiração profissional (6 min), com GROW',[
+    'G (objetivo): "Onde quer estar em 1 a 2 anos? Gestão, especialista, outra área?"',
     'R (realidade): "O que você já faz bem para chegar lá? O que falta?"',
-    'O (opções): "Que caminhos você vê? O que mais poderia fazer?" Deixe a pessoa gerar as opções, para ela se comprometer com elas.',
-    'W (vontade): "O que você vai fazer, até quando, e como eu vou saber?"',
-    'Monte o plano no 70-20-10: 70% na prática (projeto ou desafio no trabalho), 20% com pessoas (mentoria, acompanhar alguém), 10% em estudo (curso, leitura).']],
-  ['4. Feedback e observações (7 min), com SBI',[
-    'Reconheça primeiro, de forma específica: situação, comportamento e impacto.',
-    'Para melhoria, use SBI: "Na reunião de segunda (situação), você respondeu ao corretor de forma ríspida (comportamento), e ele saiu sem a informação e reclamou ao comercial (impacto)." Depois pergunte: "como você vê isso?"',
-    'Fale do comportamento, nunca da pessoa nem de quem avaliou no 360°.',
-    'Cuidar e cobrar ao mesmo tempo (Radical Candor): direto no ponto e mostrando que você se importa.']],
-  ['3. Ações definidas e 5. Próximos passos (8 min)',[
-    'No máximo 3 combinados, cada um com dono e prazo. Você também assume compromissos ("o que eu faço por você até o próximo?").',
-    'Peça a rota escrita em até 15 dias pelo painel: onde está, onde quer chegar e especialização.',
-    'Feche com: "O que foi mais útil hoje? O que eu posso fazer diferente como seu gestor?"']],
+    'O (opções): deixe a pessoa gerar os caminhos. Use as trilhas da área como cardápio, não como imposição.',
+    'W (vontade): o compromisso vira ação no bloco 6.']],
+  ['4. Desafios e pontos de melhoria (7 min)',[
+    '"Qual é o maior obstáculo hoje para você entregar mais? O que atrapalha e não depende de você?"',
+    'Traga o clima de agosto para a conversa: o roteiro mostra os itens com nota baixa mais ligados à área da pessoa. Pergunte como ela vê aquilo no dia a dia.',
+    'Os pontos do 360° servem de contexto para você. Não leia comentários nem cite avaliadores.']],
+  ['5. Processo, rotina e gestão de tempo (8 min)',[
+    'Peça para ver a agenda da semana. O modelo é o da Katia: horário bloqueado no Teams para o trabalho de foco, horário para interrupções, prioridades combinadas com você.',
+    'Repasse as metas: empresa (50%), equipe (10%) e individuais (20%). Feche número e prazo nas individuais (SMART).',
+    'Use as perguntas da área (banco abaixo).']],
+  ['6. Plano de ação de melhorias (7 min)',[
+    'Confirme as ações abertas: o que foi entregue e o que travou.',
+    'Monte o plano no 70-20-10: um desafio na prática, uma pessoa para aprender junto, um estudo.',
+    'No máximo 3 combinados, com dono e prazo. Você também assume compromissos.']],
+  ['7. Feedback (6 min), com SBI e nos dois sentidos',[
+    'Reconheça primeiro e de forma específica: situação, comportamento e impacto.',
+    'Melhoria com SBI e depois a pergunta: "como você vê isso?" (Radical Candor: cuidar e cobrar ao mesmo tempo).',
+    'Peça feedback para você: "O que eu posso fazer diferente como seu gestor?" e feche com "o que foi mais útil hoje?"']],
   ['Depois do 1:1 (até 24 h)',[
     'Me envie a transcrição, o resumo e os clues dos óculos com o nome da pessoa e a data.',
     'Eu lanço no painel: resumo e combinados (a pessoa vê), metas individuais, plano de desenvolvimento (rota e ações 70-20-10), humor, devolutiva e nota privada com o que for pessoal (só você vê).',
@@ -552,13 +631,120 @@ function renderGuia(){
   const areas=Object.entries(AREA_Q).map(([a,q])=>`<div class="panel"><h3>${a}</h3><p style="margin:0 0 4px"><strong>O que medir (resultado individual e de equipe)</strong></p><ul class="l">${q.medir.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
     <p style="margin:10px 0 4px"><strong>Perguntas de desenvolvimento</strong></p><ul class="l">${q.perguntas.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
     <p style="margin:10px 0 4px"><strong>Trilhas de especialização</strong></p><p style="margin:0">${q.trilhas.map(esc).join(' · ')}</p></div>`).join('');
-  $('#tab-guia').innerHTML=`<div class="panel"><h2>Como conduzir o 1:1</h2><p class="hint" style="margin:0 0 10px">Passo a passo na estrutura do 1:1 da Katia de 10/02 (objetivos, momento atual, processos e eficiência, visão estratégica, ações, feedback e próximos passos), em 45 minutos, com métodos reconhecidos de desenvolvimento de pessoas. O roteiro de cada pessoa, já preenchido, está na ficha e na aba Roteiros.</p><button class="btn" id="guia-pdf">Exportar PDF</button></div>
+  $('#tab-guia').innerHTML=`<div class="panel"><h2>Como conduzir o 1:1</h2><p class="hint" style="margin:0 0 10px">Passo a passo em 7 blocos e 45 minutos: momento atual, expectativas, aspiração, desafios, rotina, plano de ação e feedback, com métodos reconhecidos de desenvolvimento de pessoas. Para conduzir a reunião com cronômetro e anotações, use a aba Roteiros.</p><button class="btn" id="guia-pdf">Exportar PDF</button></div>
     ${passos}
     <h2 class="sec">Perguntas por área</h2>${areas}
     <div class="panel"><h3>Estágio</h3><ul class="l">${ESTAGIO_Q.perguntas.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
     <h2 class="sec">Referências</h2><div class="panel"><ul class="l">${REFERENCIAS.map(([t,u])=>`<li>${u?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`:esc(t)}</li>`).join('')}</ul></div>`;
 }
 document.addEventListener('click',e=>{if(S.papel==='admin'&&e.target.id==='guia-pdf')window.print()});
+
+/* ---- 48-acompanhamento.js ---- */
+/* ===== Acompanhamento do ano: plano de ação, melhorias, desenvolvimento e evolução =====
+   Cores validadas com o método de dataviz: 70-20-10 = categóricas 1 a 3 (azul, laranja, verde-água; todas as combinações passam
+   para daltonismo); situação das ações = paleta de status fixa, sempre com ícone e rótulo. Animações com Motion (motion.dev),
+   desligadas quando o sistema pede menos movimento. */
+const CICLOS=[['c1','Ciclo 1','out/26','2026-10-13','2026-12-14'],['c2','Ciclo 2','dez/26','2026-12-15','2027-02-14'],['c3','Ciclo 3','fev/27','2027-02-15','2027-04-14'],
+  ['c4','Ciclo 4','abr/27','2027-04-15','2027-06-14'],['c5','Ciclo 5','jun/27','2027-06-15','2027-08-14'],['c6','Ciclo 6','ago/27','2027-08-15','2027-10-12']];
+const SIT={feita:['Concluída','✓','#0ca30c'],emdia:['Em dia','○','#9aa0a8'],vence:['Vence em 7 dias','!','#fab219'],atrasada:['Atrasada','▲','#d03b3b']};
+const TIPO_COR={'PDI · 70':'var(--c70)','PDI · 20':'var(--c20)','PDI · 10':'var(--c10)'};
+const menosMov=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+function situacao(a){
+  if(a.feita)return 'feita';if(!a.prazo)return 'emdia';
+  const d=(new Date(a.prazo+'T23:59:59')-new Date())/864e5;return d<0?'atrasada':d<=7?'vence':'emdia';
+}
+function tipoAcao(a){const o=String(a.origem||'');return o.startsWith('PDI · 70')?'70':o.startsWith('PDI · 20')?'20':o.startsWith('PDI · 10')?'10':o.startsWith('1:1 anterior')?'ant':'comb'}
+const TIPO_NOME={'70':'PDI · prática (70)','20':'PDI · pessoas (20)','10':'PDI · estudo (10)',comb:'Combinado de 1:1',ant:'De 1:1 anterior'};
+function filtroAc(){const f=S.acf||{};return P.filter(p=>(!f.area||p.area===f.area)&&(!f.pid||p.id===f.pid))}
+function renderAcompanhamento(){
+  const f=S.acf=S.acf||{sit:'',tipo:''},gente=filtroAc(),ids=new Set(gente.map(p=>p.id));
+  const acoes=Object.values(S.acoesRows).filter(a=>ids.has(a.pessoa_id));
+  const cont={feita:0,emdia:0,vence:0,atrasada:0};acoes.forEach(a=>cont[situacao(a)]++);
+  const ciclo=CICLOS.find(c=>c[0]===CICLO)||CICLOS[0];
+  const feitos=gente.filter(p=>feito(p.id)).length;
+  const comPdi=gente.filter(p=>((S.perfil[p.id]||{}).pdi||{}).quer).length;
+  const tots=gente.map(p=>totais(p,S.kpis[p.id]||{}).tot).filter(x=>x!=null);
+  const tiles=[['1:1s no '+ciclo[1].toLowerCase(),feitos,`de ${gente.length}`,''],['Ações em aberto',cont.emdia+cont.vence+cont.atrasada,`${cont.vence} vencem em 7 dias`,''],
+    ['Atrasadas',cont.atrasada,cont.atrasada?'precisam de conversa':'nenhuma',cont.atrasada?'crit':''],['Concluídas',cont.feita,`de ${acoes.length} ações`,'good'],
+    ['Com plano de desenvolvimento',comPdi,`de ${gente.length} pessoas`,''],['Resultado médio',tots.length?Math.round(mean(tots)):null,tots.length?'% do ciclo':'aguardando metas','']];
+  const areas=[...new Set(P.map(p=>p.area).filter(Boolean))];
+  $('#tab-acompanhamento').innerHTML=`
+  <div class="bar ac-f"><select id="acf-area" aria-label="Filtrar por área"><option value="">Todas as áreas</option>${areas.map(a=>`<option ${f.area===a?'selected':''}>${esc(a)}</option>`).join('')}</select>
+    <select id="acf-pid" aria-label="Filtrar por pessoa"><option value="">Todas as pessoas</option>${P.filter(p=>!f.area||p.area===f.area).map(p=>`<option value="${p.id}" ${f.pid===p.id?'selected':''}>${esc(p.nome)}</option>`).join('')}</select>
+    ${f.area||f.pid?'<button class="chip" id="acf-limpa">Limpar filtros</button>':''}</div>
+  <div class="tiles">${tiles.map(([l,v,n,c])=>`<div class="stat ${c}"><div class="l">${l}</div><div class="v num" data-count="${v??''}">${v==null?'—':v}</div><div class="n">${n}</div></div>`).join('')}</div>
+  <div class="grid g2 ac-g">
+    <div class="panel"><h2>Plano de ação por pessoa</h2><p class="hint">Ações combinadas e do plano de desenvolvimento, pela situação. Passe o mouse para ver os números. Clique no nome para filtrar.</p>
+      ${legenda(Object.values(SIT).map(([l,i,c])=>[l,c,i]))}<div class="sb">${gente.map(p=>barraPessoa(p)).join('')}</div></div>
+    <div class="panel"><h2>Desenvolvimento 70-20-10</h2><p class="hint">Ações do plano por tipo: concluídas / total. Cada pessoa deveria ter pelo menos uma de cada.</p>
+      ${legenda([['Prática (70)','var(--c70)'],['Pessoas (20)','var(--c20)'],['Estudo (10)','var(--c10)']])}<div class="dv">${gente.map(p=>linhaPdi(p)).join('')}</div></div>
+  </div>
+  <div class="panel" style="margin-top:16px"><h2>Mapa do ano</h2><p class="hint">Um 1:1 por pessoa a cada ciclo de dois meses. ✓ realizado, ◷ agendado, vazio ainda não marcado. O número é o resultado do ciclo quando as metas tiverem atingimento.</p>
+    <div class="scroll"><table class="mapa"><thead><tr><th>Pessoa</th>${CICLOS.map(c=>`<th>${c[1]}<br><span class="hint" style="font-weight:400">${c[2]}</span></th>`).join('')}</tr></thead><tbody>${gente.map(p=>linhaMapa(p)).join('')}</tbody></table></div></div>
+  <div class="panel" style="margin-top:16px"><h2>Termômetro do time</h2><p class="hint">Último termômetro de cada pessoa (1 a 5), registrado no modo de condução do 1:1. Vermelho pede atenção.</p>
+    ${termometroTime(gente)}</div>
+  <div class="panel" style="margin-top:16px"><h2>Lista do plano de ação e melhorias</h2>
+    <div class="bar"><select id="acf-sit" aria-label="Situação"><option value="">Todas as situações</option>${Object.entries(SIT).map(([k,[l]])=>`<option value="${k}" ${f.sit===k?'selected':''}>${l}</option>`).join('')}</select>
+      <select id="acf-tipo" aria-label="Tipo"><option value="">Todos os tipos</option>${Object.entries(TIPO_NOME).map(([k,l])=>`<option value="${k}" ${f.tipo===k?'selected':''}>${l}</option>`).join('')}</select></div>
+    ${listaAcoes(acoes)}</div>`;
+  animarAcompanhamento();
+}
+function legenda(it){return `<div class="legend">${it.map(([l,c,i])=>`<span><i class="sw" style="background:${c}"></i>${i?i+' ':''}${l}</span>`).join('')}</div>`}
+function barraPessoa(p){
+  const a=Object.values(S.acoesRows).filter(x=>x.pessoa_id===p.id),c={feita:0,emdia:0,vence:0,atrasada:0};a.forEach(x=>c[situacao(x)]++);
+  const tot=a.length||1,max=Math.max(1,...P.map(q=>Object.values(S.acoesRows).filter(x=>x.pessoa_id===q.id).length));
+  const segs=['feita','emdia','vence','atrasada'].filter(k=>c[k]).map(k=>`<i class="seg" style="--w:${100*c[k]/max}%;background:${SIT[k][2]}" data-tip="${esc(p.nome)}: ${c[k]} ${SIT[k][0].toLowerCase()}"></i>`).join('');
+  return `<div class="sbr"><button class="lnk nm" data-acpid="${p.id}">${esc(p.nome)}</button><div class="trk">${segs||'<span class="hint" style="margin:0">sem ações</span>'}</div><span class="num v">${a.length?`${c.feita}/${a.length}`:''}</span></div>`;
+}
+function linhaPdi(p){
+  const a=Object.values(S.acoesRows).filter(x=>x.pessoa_id===p.id);
+  const cel=t=>{const l=a.filter(x=>tipoAcao(x)===t),d=l.filter(x=>x.feita).length;
+    return `<span class="pd ${l.length?'':'vazio'}" style="--c:var(--c${t})" data-tip="${esc(p.nome)} · ${TIPO_NOME[t]}: ${d} de ${l.length} concluídas"><i class="pf" style="--w:${l.length?100*d/l.length:0}%"></i><b>${l.length?d+'/'+l.length:'—'}</b></span>`};
+  return `<div class="dvr"><button class="lnk nm" data-acpid="${p.id}">${esc(p.nome)}</button>${cel('70')}${cel('20')}${cel('10')}</div>`;
+}
+function linhaMapa(p){
+  return `<tr><td><button class="lnk" data-open="${p.id}">${esc(p.nome)}</button></td>${CICLOS.map(([id,,,ini,fim])=>{
+    const e=S.uno.filter(u=>u.pid===p.id&&u.ciclo===id),ag=id===CICLO&&slotDe(p);
+    const tt=id===CICLO?totais(p,S.kpis[p.id]||{}).tot:null;
+    if(e.length)return `<td class="mp ok" data-tip="${esc(p.nome)}: 1:1 em ${fdata(e[0].data)}">✓ ${fdata(e[0].data).slice(0,5)}${tt!=null?`<br><span class="num">${Math.round(tt)}%</span>`:''}</td>`;
+    if(ag){const s=SLOT_BY_ID[slotDe(p)];return `<td class="mp ag" data-tip="${esc(p.nome)}: agendado ${s?esc(s.dl)+' '+s.a:''}">◷ ${s?esc(s.dl.split(' ')[1]):''}</td>`}
+    return '<td class="mp"></td>'}).join('')}</tr>`;
+}
+function termometroTime(gente){
+  const ult=p=>{const e=S.uno.filter(u=>u.pid===p.id&&u.termometro).sort((a,b)=>String(b.data).localeCompare(String(a.data)))[0];return e?e.termometro:null};
+  const linhas=gente.map(p=>[p,ult(p)]);
+  if(!linhas.some(x=>x[1]))return '<p class="def" style="margin:0">Ainda sem termômetro registrado. Ele entra quando você conduz o 1:1 pela aba Roteiros e leva para o registro.</p>';
+  return `<div class="scroll"><table class="tm-t"><thead><tr><th>Pessoa</th>${TERMO.map(([,l])=>`<th>${l}</th>`).join('')}</tr></thead><tbody>${linhas.map(([p,t])=>`<tr><td>${esc(p.nome)}</td>${TERMO.map(([k,l])=>{const v=t&&t[k];return `<td><span class="tc ${v?'v'+v:''}" data-tip="${esc(p.nome)} · ${l}: ${v||'sem registro'}">${v||'·'}</span></td>`}).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+function listaAcoes(acoes){
+  const f=S.acf;let l=acoes.filter(a=>(!f.sit||situacao(a)===f.sit)&&(!f.tipo||tipoAcao(a)===f.tipo));
+  const ord={atrasada:0,vence:1,emdia:2,feita:3};l.sort((a,b)=>ord[situacao(a)]-ord[situacao(b)]||String(a.prazo||'9').localeCompare(String(b.prazo||'9')));
+  if(!l.length)return '<p class="def" style="margin:0">Nenhuma ação com esse filtro.</p>';
+  return `<div class="scroll"><table class="al"><thead><tr><th></th><th>Ação</th><th>Pessoa</th><th>Tipo</th><th>Prazo</th><th>Situação</th></tr></thead><tbody>${l.map(a=>{const s=situacao(a),[sl,si,sc]=SIT[s],t=tipoAcao(a);
+    return `<tr class="${s}"><td><input type="checkbox" data-acao="${a.id}" ${a.feita?'checked':''} aria-label="Concluir: ${esc(a.texto)}"></td><td>${esc(a.texto)}</td><td>${esc((PB[a.pessoa_id]||{}).nome||'')}</td>
+      <td><span class="tg" style="${TIPO_COR['PDI · '+t]?'border-color:'+TIPO_COR['PDI · '+t]:''}">${TIPO_NOME[t]}</span></td><td class="num">${a.prazo?fdata(a.prazo):'—'}</td><td><span class="stt" style="--c:${sc}">${si} ${sl}</span></td></tr>`}).join('')}</tbody></table></div>`;
+}
+function animarAcompanhamento(){
+  const M=window.Motion,chave=JSON.stringify(S.acf);
+  if(!M||menosMov()||S.acAnim===chave)return;S.acAnim=chave;
+  try{
+    $$('#tab-acompanhamento [data-count]').forEach(el=>{const n=Number(el.dataset.count);if(!el.dataset.count||isNaN(n))return;M.animate(0,n,{duration:.8,ease:'easeOut',onUpdate:v=>el.textContent=Math.round(v)})});
+    M.animate('#tab-acompanhamento .tiles .stat',{opacity:[0,1],y:[8,0]},{delay:M.stagger(.04),duration:.35});
+    M.animate('#tab-acompanhamento .seg',{scaleX:[0,1]},{delay:M.stagger(.015),duration:.5,ease:'easeOut'});
+    M.animate('#tab-acompanhamento .pf',{scaleX:[0,1]},{delay:M.stagger(.01),duration:.5,ease:'easeOut'});
+    M.animate('#tab-acompanhamento .mp.ok, #tab-acompanhamento .tc[class*="v"]',{opacity:[0,1],scale:[.6,1]},{delay:M.stagger(.01),duration:.3});
+  }catch(e){console.warn(e)}
+}
+document.addEventListener('change',e=>{
+  if(S.papel!=='admin')return;const t=e.target;
+  const map={'acf-area':'area','acf-pid':'pid','acf-sit':'sit','acf-tipo':'tipo'};
+  if(map[t.id]){S.acf=Object.assign({},S.acf,{[map[t.id]]:t.value});if(t.id==='acf-area')S.acf.pid='';renderAcompanhamento()}
+});
+document.addEventListener('click',e=>{
+  if(S.papel!=='admin')return;const t=e.target;
+  const b=t.closest('[data-acpid]');if(b){S.acf=Object.assign({},S.acf,{pid:b.dataset.acpid});renderAcompanhamento();return}
+  if(t.id==='acf-limpa'){S.acf={sit:'',tipo:''};renderAcompanhamento()}
+});
 
 /* ---- 50-eventos-master.js ---- */
 /* ===== Eventos do painel do diretor ===== */
@@ -583,7 +769,7 @@ document.addEventListener('click',async e=>{
     const res=$('#f-res').value.trim();if(!res){toast('Descreva o que foi conversado.');return}
     t.disabled=true;
     try{
-      const r=await S.sb.from('encontros').insert({pessoa_id:S.open,ciclo:CICLO,data:$('#f-data').value||hoje(),humor:Number($('#f-humor').value),resumo:res,combinados:$('#f-prox').value.trim(),devolutiva:$('#f-dev').checked}).select('id').single();
+      const r=await S.sb.from('encontros').insert({pessoa_id:S.open,ciclo:CICLO,data:$('#f-data').value||hoje(),humor:Number($('#f-humor').value),resumo:res,combinados:$('#f-prox').value.trim(),devolutiva:$('#f-dev').checked,termometro:(S.termoPend&&S.termoPend.pid===S.open)?S.termoPend.termo:null}).select('id').single();
       if(r.error)throw r.error;
       const nota=$('#f-nota').value.trim();
       if(nota){const n=await S.sb.from('notas_diretor').insert({pessoa_id:S.open,encontro_id:r.data.id,texto:nota});if(n.error)throw n.error}
@@ -622,12 +808,12 @@ document.addEventListener('pointermove',e=>{
 });
 
 /* ===== Render do painel ===== */
-const ABAS=['geral','pessoas','agenda','roteiros','guia','clima','kpis','acessos','historico'];
+const ABAS=['geral','acompanhamento','pessoas','agenda','roteiros','guia','clima','kpis','acessos','historico'];
 function render(){
   if(S.papel!=='admin')return;
   $$('#tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===S.tab)));
   ABAS.forEach(k=>$('#tab-'+k).hidden=k!==S.tab);
-  ({geral:renderGeral,pessoas:renderPessoas,agenda:renderAgenda,roteiros:renderRoteiros,guia:renderGuia,clima:renderClima,kpis:renderKpis,acessos:renderAcessos,historico:renderHistorico})[S.tab]();
+  ({geral:renderGeral,acompanhamento:renderAcompanhamento,pessoas:renderPessoas,agenda:renderAgenda,roteiros:renderRoteiros,guia:renderGuia,clima:renderClima,kpis:renderKpis,acessos:renderAcessos,historico:renderHistorico})[S.tab]();
 }
 function onData(ts){render();if($('#ficha').open)fichaDin();if($('#previa').open&&S.previaId)abrirPrevia(S.previaId)}
 

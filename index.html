@@ -23,6 +23,7 @@
   </header>
   <nav class="tabs" role="tablist" id="tabs">
     <button role="tab" data-tab="geral" aria-selected="true">Visão geral</button>
+    <button role="tab" data-tab="acompanhamento" aria-selected="false">Acompanhamento</button>
     <button role="tab" data-tab="pessoas" aria-selected="false">Pessoas</button>
     <button role="tab" data-tab="agenda" aria-selected="false">Agenda</button>
     <button role="tab" data-tab="roteiros" aria-selected="false">Roteiros</button>
@@ -33,6 +34,7 @@
     <button role="tab" data-tab="historico" aria-selected="false">Histórico</button>
   </nav>
   <section id="tab-geral"></section>
+  <section id="tab-acompanhamento" hidden></section>
   <section id="tab-pessoas" hidden></section>
   <section id="tab-agenda" hidden></section>
   <section id="tab-roteiros" hidden></section>
@@ -49,6 +51,7 @@
 <div id="toast" class="toast" role="status" hidden></div>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/motion@11.18.2/dist/motion.js" integrity="sha384-lFfU+kVPBF9H3h8c1O+KQNuTRX7dilL8RZiy/kxQiYulHvYCHv4z+eba37GD2qTC" crossorigin="anonymous"></script>
 <script src="app.js"></script>
 </body>
 </html>
