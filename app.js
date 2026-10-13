@@ -91,6 +91,7 @@ const CARGA={
   acoes:async()=>{S.acoesRows={};(await sel('acoes',S.sb.from('acoes').select('*'))).forEach(r=>S.acoesRows[r.id]=r)},
   atualizacoes:async()=>{S.atu=await sel('atualizacoes',S.sb.from('atualizacoes').select('*').order('em',{ascending:false}).limit(2000))},
   propostas:async()=>{S.prop={};(await sel('propostas',S.sb.from('propostas').select('*').eq('ciclo',CICLO))).forEach(r=>{(S.prop[r.pessoa_id]=S.prop[r.pessoa_id]||{})[r.chave]={texto:r.texto,em:r.atualizado_em}})},
+  comentarios:async()=>{S.com={};(await sel('comentarios',S.sb.from('comentarios').select('*').eq('ciclo',CICLO))).forEach(r=>{(S.com[r.pessoa_id]=S.com[r.pessoa_id]||{})[r.campo]={texto:r.texto,em:r.atualizado_em}})},
   preparacao:async()=>{S.prep={};(await sel('preparacao',S.sb.from('preparacao').select('*').eq('ciclo',CICLO))).forEach(r=>{(S.prep[r.pessoa_id]=S.prep[r.pessoa_id]||{})[r.campo]={texto:r.texto,em:r.atualizado_em}})},
   metas_coletivas:async()=>{S.metas=await sel('metas_coletivas',S.sb.from('metas_coletivas').select('*').eq('ciclo',CICLO).order('ordem').order('criado_em'))},
   config:async()=>{const c=await sel('config',S.sb.from('config').select('*'));c.forEach(r=>{if(r.chave==='clima')CLIMA=r.valor;if(r.chave==='md')MD=r.valor})},
@@ -245,7 +246,8 @@ document.addEventListener('change',async e=>{
 function ficha(id){
   const p=PB[id];S.open=id;const d=$('#ficha');
   const a=areaDe(p), kp=cfg(id).kpi[CICLO], t=totais(p,kp), mudou=p.area!==p.areaOriginal;
-  const kRow=(g,l)=>`<tr><td>${esc(l)}</td><td><input type="text" data-kg="${g}" data-k="${slug(l)}" data-f="meta" value="${esc((kp[slug(l)]||{}).meta||'')}" placeholder="a definir" aria-label="Meta: ${esc(l)}"></td><td style="width:96px"><input type="number" min="0" max="100" data-kg="${g}" data-k="${slug(l)}" data-f="ating" value="${esc((kp[slug(l)]||{}).ating??'')}" aria-label="Atingimento: ${esc(l)}"></td></tr>`;
+  const prop=S.prop[id]||{};
+  const kRow=(g,l)=>`<tr><td>${esc(l)}${(prop[slug(l)]||{}).texto?`<div class="hint" style="margin:2px 0 0">Proposta: ${esc(prop[slug(l)].texto)}</div>`:''}</td><td><input type="text" data-kg="${g}" data-k="${slug(l)}" data-f="meta" value="${esc((kp[slug(l)]||{}).meta||'')}" placeholder="a definir" aria-label="Meta: ${esc(l)}"></td><td style="width:96px"><input type="number" min="0" max="100" data-kg="${g}" data-k="${slug(l)}" data-f="ating" value="${esc((kp[slug(l)]||{}).ating??'')}" aria-label="Atingimento: ${esc(l)}"></td></tr>`;
   d.innerHTML=`<div class="fi">
    <div class="fi-top"><div class="l"><span class="av" aria-hidden="true">${esc(ini(p.nome))}</span><div style="min-width:0"><h2>${esc(p.nome)}</h2><div class="sub">${esc(p.cargo||'')}</div></div></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">${pill(p)}<button class="btn sec" id="ver-como">Ver como a pessoa vê</button><button class="x" data-close aria-label="Fechar">×</button></div></div>
    <div class="panel"><div class="two"><div class="field"><label for="fi-area">Área</label><select id="fi-area"><option value="">${mudou?'Voltar para '+esc(p.areaOriginal):esc(a.nome)+' (informada)'}</option>${AREAS.map(x=>`<option ${mudou&&p.area===x?'selected':''}>${x}</option>`).join('')}</select><span class="hint" style="margin:0">${mudou?'Definida por você':'Fonte: '+esc(p.fonteArea||'')}</span></div>
@@ -253,7 +255,7 @@ function ficha(id){
      <div class="facts"><div><div class="l">Técnica</div><div class="v">${f2(p.t)}</div></div><div><div class="l">Postura</div><div class="v">${f2(p.p)}</div></div><div><div class="l">Média 360°</div><div class="v">${f2(p.m)}</div></div><div><div class="l">Avaliações</div><div class="v">${p.n||'—'}</div></div></div></div>
    <div id="fi-outlook"></div>
    <div class="panel"><h3>O que o 360° diz (ago/2026)</h3><p style="margin:0 0 8px"><strong>Pontos fortes:</strong> ${esc(p.fortesTxt||'')}</p>${(p.melhTxt||[]).length?`<p style="margin:0 0 4px"><strong>Pontos de melhoria (${p.melh}):</strong></p><ul>${p.melhTxt.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p style="margin:0"><strong>Pontos de melhoria:</strong> nenhum registrado.</p>'}<p class="hint" style="margin:8px 0 0">Síntese dos comentários anônimos. O 360° é confidencial: não cite avaliadores. Esta parte só você vê.</p></div>
-   <div class="panel"><h3>O que a pessoa escreveu para o 1:1</h3><div id="fi-pessoa"></div></div>
+   <div class="panel"><h3>Visão da pessoa e seus comentários</h3><div id="fi-pessoa"></div></div>
    <div class="panel"><h3>Último 1:1 antes do ciclo</h3>${p.ultimo?`<p style="margin:0 0 4px"><strong>${esc(p.ultimo.data)}</strong> · <span class="hint">${esc(p.ultimo.fonte||'')}</span></p><p style="margin:0">${esc(p.ultimo.resumo)}</p>`:`<p class="hint" style="margin:0">Sem registro anterior.${p.obs?' '+esc(p.obs):''}</p>`}</div>
    <div class="panel"><h3>Roteiro do 1:1 · 45 min</h3><p class="hint" style="margin:0 0 8px">7 blocos, preenchidos para ${esc(p.nome.split(' ')[0])} (${TIPO_ROT[roteiro(p).tipo]}). Use "Conduzir este 1:1" durante a reunião.</p>${htmlRoteiro(p)}</div>
    <div class="panel"><h3>KPIs do ciclo</h3><p class="hint">Salva ao sair do campo. A pessoa vê a meta e o atingimento na hora.</p>
@@ -285,10 +287,7 @@ function fichaDin(){
   $('#fi-acoes').innerHTML=ac.length?ac.map(a=>`<label class="act ${a.done?'done':''}"><input type="checkbox" data-acao="${a.id}" ${a.done?'checked':''}><span><span class="tx">${esc(a.tx)}</span>${a.pz||a.dono?`<br><span class="pz">${a.pz?'Prazo '+a.pz:''}${a.dono?' · '+esc(a.dono):''}</span>`:''}${a.anterior?`<br><span class="pz">De 1:1 anterior. Confirme se foi entregue.</span>`:''}</span></label>`).join(''):'<p class="hint" style="margin:0">Nenhuma ação registrada.</p>';
   const h=unoDe(p.id),notas=S.notas.filter(n=>n.pessoa_id===p.id);
   $('#fi-hist').innerHTML=h.length?h.map(u=>{const nt=notas.filter(n=>n.encontro_id===u.id);return `<div class="hist"><div class="d">${fdata(u.data)} · humor ${u.humor||'—'}/5 ${u.devolutiva?'· <span class="ok">devolutiva dada</span>':''}</div><div>${esc(u.resumo)}</div>${u.proximos?`<div class="hint" style="margin:4px 0 0">Combinados: ${esc(u.proximos)}</div>`:''}${nt.map(n=>`<div class="hint" style="margin:4px 0 0"><strong>Nota privada:</strong> ${esc(n.texto)}</div>`).join('')}</div>`}).join(''):'<p class="hint" style="margin:0">Nenhum 1:1 registrado neste ciclo.</p>';
-  const pr=S.prop[p.id]||{},pp=S.prep[p.id]||{},kn=Object.fromEntries((S.kpiRows[p.id]||[]).map(r=>[r.chave,r.nome]));
-  const linhasP=Object.entries(pr).filter(([,v])=>v.texto).map(([k,v])=>`<li>${esc(kn[k]||k)}: <strong>${esc(v.texto)}</strong></li>`).join('');
-  const linhasC=[['conquistas','Conquistas'],['dificuldades','Dificuldades'],['preciso','Precisa de você'],['assuntos','Assuntos']].filter(([k])=>pp[k]&&pp[k].texto).map(([k,l])=>`<p style="margin:6px 0 0"><strong>${l}:</strong> <span style="white-space:pre-wrap">${esc(pp[k].texto)}</span></p>`).join('');
-  $('#fi-pessoa').innerHTML=(linhasP||linhasC)?`${linhasP?`<p style="margin:0 0 4px"><strong>Metas propostas</strong></p><ul>${linhasP}</ul>`:''}${linhasC}`:'<p class="hint" style="margin:0">Ainda nada. Quando a pessoa escrever na página dela, aparece aqui na hora.</p>';
+  const fp=$('#fi-pessoa');if(fp&&!fp.contains(document.activeElement))fp.innerHTML=htmlVisao(p);
   const at=S.atu.filter(x=>x.pessoa_id===p.id).slice(0,30);
   $('#fi-atu').innerHTML=at.length?at.map(x=>`<div class="hist"><div class="d">${fdh(x.em)} · ${x.autor==='diretor'?'Riccardo':x.autor==='pessoa'?esc(p.nome.split(' ')[0]):'Sistema'}</div><div>${esc(x.texto)}</div></div>`).join(''):'<p class="hint" style="margin:0">Sem mudanças ainda.</p>';
   $('#fi-outlook').innerHTML=blocoOutlook(p);
@@ -298,6 +297,26 @@ function fichaDin(){
   $$('#ficha [data-k]').forEach(i=>{if(document.activeElement===i)return;const v=(kp[i.dataset.k]||{})[i.dataset.f];const nv=v==null?'':String(v);if(i.value!==nv)i.value=nv});
   recalcTot();
 }
+/* visão da pessoa nos 7 blocos + propostas de meta, com o comentário do diretor embaixo de cada item */
+function htmlVisao(p){
+  const pr=S.prop[p.id]||{},pp=S.prep[p.id]||{},cm=(S.com||{})[p.id]||{},nome=esc(p.nome.split(' ')[0]);
+  const tx=v=>v&&v.texto?`<div class="vz-tx">${esc(v.texto)}</div>`:`<div class="def">${nome} ainda não escreveu.</div>`;
+  const caixa=(campo,rot)=>`<label class="vz-lab" for="cm-${esc(campo.replace(':','-'))}">Seu comentário${rot?' sobre '+esc(rot):''} (${nome} vê)</label><textarea id="cm-${esc(campo.replace(':','-'))}" data-com="${esc(campo)}" maxlength="4000" placeholder="Escreva o seu comentário">${esc((cm[campo]||{}).texto||'')}</textarea>`;
+  const kr=S.kpiRows[p.id]||[];
+  const kp=g=>kr.filter(r=>r.grupo===g).sort((a,b)=>a.ordem-b.ordem).map(r=>`<div class="vz-item"><strong>${esc(r.nome)}</strong>${tx(pr[r.chave])}${r.meta?`<div class="hint" style="margin:2px 0 0">Meta combinada: ${esc(r.meta)}</div>`:''}${caixa('kpi:'+r.chave)}</div>`).join('');
+  const antigos=[['conquistas','Conquistas'],['dificuldades','Dificuldades'],['preciso','Precisa de você'],['assuntos','Assuntos']].filter(([k])=>pp[k]&&pp[k].texto);
+  return `<p class="hint" style="margin:0 0 8px">A visão que ${nome} escreveu em cada bloco. O seu comentário salva ao sair do campo e aparece na página da pessoa.</p>
+  ${ESTRUTURA.map(([k,,t],i)=>`<details class="vz" ${pp[k]&&pp[k].texto||(cm['bloco:'+k]||{}).texto?'open':''}><summary><span class="vb-n">${i+1}</span>${esc(t)}${pp[k]&&pp[k].texto?' <span class="pill r-estavel">escreveu</span>':''}</summary>${tx(pp[k])}${caixa('bloco:'+k)}</details>`).join('')}
+  <details class="vz"><summary>Metas que ${nome} acha justas</summary><h4>Resultado individual · 20%</h4>${kp('perf')||'<p class="def">Sem metas.</p>'}<h4>Comportamental · 20%</h4>${kp('comp')||'<p class="def">Sem metas.</p>'}</details>
+  ${antigos.length?`<div style="margin-top:8px">${antigos.map(([k,l])=>`<p style="margin:6px 0 0"><strong>${l}:</strong> <span style="white-space:pre-wrap">${esc(pp[k].texto)}</span></p>`).join('')}</div>`:''}`;
+}
+async function salvarComentario(t){
+  const r=await S.sb.from('comentarios').upsert({pessoa_id:S.open,ciclo:CICLO,campo:t.dataset.com,texto:t.value.trim()},{onConflict:'pessoa_id,ciclo,campo'});
+  if(r.error){toast('Não foi possível salvar o comentário: '+erroAmigavel(r.error));return}
+  ((S.com=S.com||{})[S.open]=S.com[S.open]||{})[t.dataset.com]={texto:t.value.trim(),em:new Date().toISOString()};
+  toast('Comentário salvo. A pessoa já vê.');
+}
+document.addEventListener('change',e=>{if(S.papel==='admin'&&e.target.dataset&&e.target.dataset.com&&S.open)salvarComentario(e.target)});
 function recalcTot(){
   const p=PB[S.open],kp={};if(!p)return;
   $$('#ficha [data-k]').forEach(i=>{(kp[i.dataset.k]=kp[i.dataset.k]||{})[i.dataset.f]=i.value});
@@ -1082,7 +1101,8 @@ function descAud(r){
     case 'kpis':{const m=[];if(a.meta!==d.meta&&r.operacao==='UPDATE')m.push(`meta "${a.meta||'—'}" → "${d.meta||'—'}"`);if(a.ating!==d.ating&&r.operacao==='UPDATE')m.push(`atingimento ${a.ating??'—'} → ${d.ating??'—'}`);
       return `${nome} · ${x.nome}: ${m.join(', ')||op+' KPI'}`}
     case 'propostas':return `${nome} propôs meta para ${x.chave}: "${d.texto||''}"`;
-    case 'preparacao':return `${nome} atualizou a preparação (${x.campo})`;
+    case 'preparacao':return `${nome} escreveu a própria visão (${(ESTRUTURA.find(e=>e[0]===x.campo)||[,,x.campo])[2]})`;
+    case 'comentarios':return `comentou a visão de ${nome} (${x.campo})`;
     case 'encontros':return `${op} 1:1 de ${nome} (${fdata(x.data)})`;
     case 'notas_diretor':return `${op} nota privada sobre ${nome}`;
     case 'acoes':return r.operacao==='UPDATE'&&a.feita!==d.feita?`${nome}: combinado ${d.feita?'concluído':'reaberto'} — ${d.texto}`:`${op} combinado de ${nome}: ${x.texto}`;
@@ -1112,7 +1132,8 @@ function dadosDaPessoa(pid){
     encontros:S.uno.filter(u=>u.pid===pid).map(u=>({data:u.data,resumo:u.resumo,combinados:u.proximos})),
     atualizacoes:S.atu.filter(a=>a.pessoa_id===pid),
     propostas:Object.fromEntries(Object.entries(S.prop[pid]||{}).map(([k,v])=>[k,v.texto])),
-    preparacao:Object.fromEntries(Object.entries(S.prep[pid]||{}).map(([k,v])=>[k,v.texto]))};
+    preparacao:Object.fromEntries(Object.entries(S.prep[pid]||{}).map(([k,v])=>[k,v.texto])),
+    comentarios:Object.fromEntries(Object.entries((S.com||{})[pid]||{}).map(([k,v])=>[k,v.texto]))};
 }
 function abrirPrevia(pid){
   S.previaId=pid;const d=$('#previa');
@@ -1126,7 +1147,7 @@ function abrirPrevia(pid){
 async function exportarBackup(btn){
   btn.disabled=true;const out={gerado_em:new Date().toISOString(),projeto:'painel-1a1',tabelas:{}};
   try{
-    for(const t of ['pessoas','perfil','perfil_diretor','kpis','metas_coletivas','encontros','notas_diretor','acoes','propostas','preparacao','atualizacoes','config']){
+    for(const t of ['pessoas','perfil','perfil_diretor','kpis','metas_coletivas','encontros','notas_diretor','acoes','propostas','preparacao','comentarios','atualizacoes','config']){
       const r=await S.sb.from(t).select('*');if(r.error)throw r.error;out.tabelas[t]=r.data}
     const ac=await S.sb.from('acessos').select('email,pessoa_id,papel,ativado_em,criado_em');if(ac.error)throw ac.error;out.tabelas.acessos=ac.data;
     const nome='backup-painel-1a1-'+hoje()+'.json';
@@ -1142,8 +1163,18 @@ document.addEventListener('click',e=>{if(S.papel==='admin'&&e.target.id==='backu
 
 /* ---- 70-pessoa.js ---- */
 /* ===== Página da pessoa (também usada na pré-visualização do diretor) ===== */
-const PTABS=[['inicio','Início'],['novidades','Atualizações'],['360','Meu 360°'],['kpis','Minhas metas'],['plano','Meu plano'],['acoes','Ações e histórico'],['aval','Avaliação 360°'],['preparar','Preparar meu 1:1']];
+const PTABS=[['inicio','Início'],['preparar','Minha visão do 1:1'],['kpis','Minhas metas'],['plano','Meu plano'],['acoes','Ações e histórico'],['novidades','Atualizações'],['360','Meu 360°'],['aval','Avaliação 360°']];
 const CAMPOS=[['conquistas','O que eu conquistei desde o último 1:1'],['dificuldades','O que está difícil ou travando'],['preciso','O que eu preciso do Riccardo'],['assuntos','Assuntos que eu quero tratar']];
+/* perguntas-guia para a pessoa escrever a visão dela em cada bloco do roteiro */
+const GUIA_PESSOA={
+  atual:'Como estão as últimas 4 semanas? O melhor e o pior momento, o que mais ocupou o seu tempo e como estão a sua energia e a carga de trabalho.',
+  expect:'O que você espera da União nos próximos 12 meses? E do Riccardo como gestor? O que faria você se sentir reconhecido(a)?',
+  aspira:'Onde você quer estar em 1 a 2 anos? O que você já faz bem para chegar lá e o que falta?',
+  desafios:'Qual é o maior obstáculo hoje para você entregar mais? O que na empresa atrapalha e não depende de você? O que você mudaria primeiro?',
+  rotina:'Como é a sua semana típica? Quanto tempo vai para interrupções? O que poderia ser simplificado ou automatizado?',
+  plano:'Que melhorias você propõe para a sua área? O que quer aprender e com quem? O que você precisa do Riccardo?',
+  fb:'Que feedback você quer dar ao Riccardo e à empresa? E sobre você: em que gostaria de receber feedback?'};
+function comentarioRic(c){return c&&c.trim()?`<div class="com-ric"><span class="l">Comentário do Riccardo</span><div>${esc(c)}</div></div>`:''}
 function blocoTotais(t){
   return `<div class="grid3">${[['Empresa','50%',t.emp],['Equipe (setor)','10%',t.eq],['Resultado individual','20%',t.pf],['Comportamental','20%',t.cp],['Total','',t.tot]].map(([l,w,v])=>`<div class="stat"><div class="l">${l}${w?' · '+w:''}</div><div class="v">${pct(v)}</div></div>`).join('')}</div>`}
 function linhasColetivas(area,cols){
@@ -1160,7 +1191,7 @@ function secaoPessoa(D,tab,prev){
   if(tab==='inicio')return `<div class="panel"><h2>Olá, ${esc(nome)}</h2><p style="margin:0">Este é o seu espaço de acompanhamento. Só você e o Riccardo veem o que está aqui. Os 1:1s acontecem a cada dois meses, com 45 minutos, para olhar seus resultados, seu comportamento e o seu desenvolvimento.</p></div>
     <div class="panel"><h3>Seu próximo 1:1</h3>${pf.slot?`<div class="big">${esc(pf.slot.dl)} · ${esc(pf.slot.a)} às ${esc(pf.slot.b)}</div>${prev||S.imprimir?'':'<button class="btn sec" id="ics-meu" style="margin-top:10px">Adicionar à minha agenda (Outlook)</button>'}`:'<p class="def" style="margin:0">Horário a combinar.</p>'}</div>
     <div class="panel"><h3>Temas que vamos conversar</h3><ul class="l">${(pf.temas||[]).map(t=>`<li>${esc(t)}</li>`).join('')||'<li class="def">A definir.</li>'}</ul></div>
-    <div class="note">${metasEmpresa(pf.area).length+metasEquipe(pf.area).length?'<strong>Como seu resultado é composto:</strong> 50% metas da empresa, 10% metas da sua equipe (setor) e 40% individual: 20% seus resultados e 20% comportamento. ':''}As suas metas individuais são combinadas juntas no 1:1, a partir da proposta que você traz${S.imprimir?'.':' na aba <em>Preparar meu 1:1</em>.'}</div>`;
+    <div class="note">${metasEmpresa(pf.area).length+metasEquipe(pf.area).length?'<strong>Como seu resultado é composto:</strong> 50% metas da empresa, 10% metas da sua equipe (setor) e 40% individual: 20% seus resultados e 20% comportamento. ':''}As suas metas individuais são combinadas juntas no 1:1, a partir da proposta que você traz${S.imprimir?'.':' na aba <em>Minha visão do 1:1</em>.'}</div>`;
   if(tab==='novidades'){const at=D.atualizacoes||[];
     return `<div class="panel"><h3>Tudo o que mudou na sua página</h3>${at.length?at.map(a=>`<div class="hist"><div class="d">${fdh(a.em)} · ${a.autor==='diretor'?'Riccardo':a.autor==='pessoa'?(prev?esc(nome):'Você'):'Sistema'}</div><div>${esc(a.texto)}</div></div>`).join(''):'<p class="def" style="margin:0">Nenhuma atualização ainda.</p>'}</div>
     <p class="hint">As mudanças aparecem aqui na hora, com data, hora e quem fez.</p>`}
@@ -1190,11 +1221,17 @@ function secaoPessoa(D,tab,prev){
     <div class="panel"><h3>Histórico dos 1:1s</h3>${en.length?en.map(h=>`<div class="hist"><div class="d">${fdata(h.data)}</div><div>${esc(h.resumo)}</div>${h.combinados?`<div class="hint" style="margin:4px 0 0">Combinados: ${esc(h.combinados)}</div>`:''}</div>`).join(''):'<p class="def" style="margin:0">Seu primeiro 1:1 deste ciclo ainda vai acontecer.</p>'}</div>`}
   if(tab==='aval')return secaoAval(prev);
   if(tab==='plano')return htmlPlano(D.perfil.pdi||{},(D.acoes||[]).filter(a=>String(a.origem||'').startsWith('PDI')),dis);
-  if(tab==='preparar'){const pr=D.propostas||{},pp=D.preparacao||{};
-    return `<div class="panel"><h2>Preparar meu 1:1</h2><p class="hint">Escreva antes da conversa. Salva sozinho quando você sai do campo, e o Riccardo vê na hora. <strong id="salvo">${esc(S.salvoMsg||'')}</strong></p>
-    <h3>Metas que eu proponho</h3>${D.kpis.map(k=>`<div class="field"><label for="p-${esc(k.k)}">${esc(k.nome)}</label><input type="text" id="p-${esc(k.k)}" data-prop="${esc(k.k)}" value="${esc(pr[k.k]||'')}" placeholder="Sua proposta de meta" maxlength="300" ${dis}></div>`).join('')}
-    </div><div class="panel"><h3>Conversa</h3>
-    ${CAMPOS.map(([k,l])=>`<div class="field"><label for="m-${k}">${l}</label><textarea id="m-${k}" data-campo="${k}" maxlength="4000" ${dis}>${esc(pp[k]||'')}</textarea></div>`).join('')}</div>`}
+  if(tab==='preparar'){const pr=D.propostas||{},pp=D.preparacao||{},cm=D.comentarios||{};
+    const antigos=CAMPOS.filter(([k])=>pp[k]);
+    const meta=k=>k.meta?`<div class="hint" style="margin:4px 0 0">Meta combinada: <strong>${esc(k.meta)}</strong></div>`:'';
+    const kp=g=>D.kpis.filter(k=>k.g===g).map(k=>`<div class="field vb-kpi"><label for="p-${esc(k.k)}">${esc(k.nome)}</label><input type="text" id="p-${esc(k.k)}" data-prop="${esc(k.k)}" value="${esc(pr[k.k]||'')}" placeholder="O que você acha justo como meta" maxlength="300" ${dis}>${meta(k)}${comentarioRic(cm['kpi:'+k.k])}</div>`).join('');
+    return `<div class="panel"><h2>Minha visão do 1:1</h2><p class="hint" style="margin:0">Escreva com calma, antes ou depois da conversa, a sua visão sobre cada tema. O Riccardo lê, comenta embaixo de cada um e, no próximo 1:1, vocês fecham juntos as metas. Salva sozinho quando você sai do campo. <strong id="salvo">${esc(S.salvoMsg||'')}</strong></p></div>
+    ${ESTRUTURA.map(([k,,t],i)=>`<div class="panel vb"><div class="vb-n">${i+1}</div><div class="vb-c"><h3><label for="m-${k}">${esc(t)}</label></h3><p class="hint">${esc(GUIA_PESSOA[k])}</p>
+      <textarea id="m-${k}" data-campo="${k}" maxlength="4000" placeholder="Minha visão" ${dis}>${esc(pp[k]||'')}</textarea>${comentarioRic(cm['bloco:'+k])}</div></div>`).join('')}
+    <div class="panel"><h2>Metas que eu acho justas</h2><p class="hint">Para cada meta, escreva o que você acha justo para este ciclo (um número, um prazo ou um comportamento observável). O Riccardo comenta e vocês definem juntos no próximo 1:1.</p>
+      <h3>Resultado individual · 20%</h3>${kp('perf')||'<p class="def">Nenhuma meta de resultado cadastrada.</p>'}
+      <h3 style="margin-top:16px">Comportamental · 20%</h3>${kp('comp')||'<p class="def">Nenhuma meta comportamental cadastrada.</p>'}</div>
+    ${antigos.length?`<div class="panel"><h3>O que você escreveu antes</h3>${antigos.map(([k,l])=>`<div class="field"><label for="m-${k}">${l}</label><textarea id="m-${k}" data-campo="${k}" maxlength="4000" ${dis}>${esc(pp[k]||'')}</textarea></div>`).join('')}</div>`:''}`}
   return '';
 }
 function viewPessoa(D,tab,prev){
@@ -1204,7 +1241,7 @@ function viewPessoa(D,tab,prev){
 /* carga e gravações da pessoa logada */
 async function carregarPessoa(){
   const pid=S.pid;
-  const [pes,perf,kp,ac,en,at,pr,pp,mc]=await Promise.all([
+  const [pes,perf,kp,ac,en,at,pr,pp,mc,cm]=await Promise.all([
     sel('',S.sb.from('pessoas').select('*').eq('id',pid)),
     sel('',S.sb.from('perfil').select('*').eq('pessoa_id',pid)),
     sel('',S.sb.from('kpis').select('*').eq('pessoa_id',pid).eq('ciclo',CICLO).order('ordem')),
@@ -1213,13 +1250,14 @@ async function carregarPessoa(){
     sel('',S.sb.from('atualizacoes').select('*').eq('pessoa_id',pid).order('em',{ascending:false}).limit(500)),
     sel('',S.sb.from('propostas').select('*').eq('pessoa_id',pid).eq('ciclo',CICLO)),
     sel('',S.sb.from('preparacao').select('*').eq('pessoa_id',pid).eq('ciclo',CICLO)),
-    sel('',S.sb.from('metas_coletivas').select('*').eq('ciclo',CICLO).order('ordem').order('criado_em'))]);
+    sel('',S.sb.from('metas_coletivas').select('*').eq('ciclo',CICLO).order('ordem').order('criado_em')),
+    sel('',S.sb.from('comentarios').select('*').eq('pessoa_id',pid).eq('ciclo',CICLO))]);
   S.metas=mc;
   await carregarAvPessoa();
   S.D={nome:(pes[0]||{}).nome||'',perfil:(perf[0]||{}).dados||{},
     kpis:kp.map(r=>({g:r.grupo,k:r.chave,nome:r.nome,meta:r.meta,ating:r.ating})),
     acoes:ac,encontros:en.map(r=>({data:r.data,resumo:r.resumo,combinados:r.combinados})),atualizacoes:at,
-    propostas:Object.fromEntries(pr.map(r=>[r.chave,r.texto])),preparacao:Object.fromEntries(pp.map(r=>[r.campo,r.texto]))};
+    propostas:Object.fromEntries(pr.map(r=>[r.chave,r.texto])),preparacao:Object.fromEntries(pp.map(r=>[r.campo,r.texto])),comentarios:Object.fromEntries(cm.map(r=>[r.campo,r.texto]))};
 }
 function renderPessoa(){
   const D=S.D;if(!D)return;
@@ -1262,7 +1300,7 @@ async function iniciarPessoa(){
   $('#auth').hidden=true;$('#master').hidden=true;$('#publico').hidden=false;
   await carregarPessoa();renderPessoa();
   const f='pessoa_id=eq.'+S.pid;
-  aoVivo(['metas_coletivas','kpis','acoes','encontros','atualizacoes','perfil','propostas','preparacao'],f,async()=>{
+  aoVivo(['metas_coletivas','kpis','acoes','encontros','atualizacoes','perfil','propostas','preparacao','comentarios'],f,async()=>{
     // recarrega tudo da pessoa (poucas linhas) e só redesenha se ela não estiver digitando
     const foco=document.activeElement;const digitando=foco&&(foco.dataset.prop||foco.dataset.campo);
     await carregarPessoa();if(!digitando)renderPessoa();
@@ -1317,9 +1355,9 @@ async function entrarSessao(){
 }
 async function iniciarMaster(){
   $('#auth').hidden=true;$('#publico').hidden=true;$('#master').hidden=false;
-  for(const t of ['config','pessoas','perfil','kpis','encontros','acoes','atualizacoes','propostas','preparacao','acessos','notas_diretor','auditoria','metas_coletivas'])await CARGA[t]();
+  for(const t of ['config','pessoas','perfil','kpis','encontros','acoes','atualizacoes','propostas','preparacao','comentarios','acessos','notas_diretor','auditoria','metas_coletivas'])await CARGA[t]();
   render();
-  aoVivo(['metas_coletivas','kpis','acoes','encontros','atualizacoes','perfil','perfil_diretor','propostas','preparacao','acessos','config','notas_diretor','auditoria','pessoas'],null,ts=>onData(ts));
+  aoVivo(['metas_coletivas','kpis','acoes','encontros','atualizacoes','perfil','perfil_diretor','propostas','preparacao','comentarios','acessos','config','notas_diretor','auditoria','pessoas'],null,ts=>onData(ts));
 }
 (async()=>{
   const C=window.CONFIG||{};
