@@ -589,7 +589,7 @@ const REGRA_REGISTRO=['Resumo e combinados (a pessoa vê): só fatos e combinado
   'Áudio e transcrição: apague depois de lançar no painel. Guardar só pelo tempo necessário reduz risco.'];
 const GUIA=[
   ['Antes do 1:1 (até 2 dias antes)',[
-    'Lembre a pessoa de preencher "Preparar meu 1:1" no painel (conquistas, dificuldades, o que precisa de você, proposta de metas).',
+    'Lembre a pessoa de preencher "Minha visão do 1:1" no painel (a visão dela nos 7 blocos e a proposta de metas). Quem ainda não entrou precisa do código gerado em Acessos.',
     'Abra a ficha: leia o roteiro, o que a pessoa escreveu, as ações abertas e o último 1:1. 10 minutos bastam.',
     'Confira as metas da empresa e da equipe na aba KPIs, para poder falar dos 60% que são coletivos.',
     'Escolha 1 reconhecimento específico para fazer. Reconhecimento foi a 3ª nota mais baixa do clima (3,93).']],
@@ -1000,7 +1000,7 @@ const CICLO_ANO='2026';
 function emailDe(pid){const a=S.acessos.find(x=>x.pessoa_id===pid&&x.papel==='pessoa');return a?a.email:((PB[pid]||{}).email||'')}
 function emailDiretor(){const a=S.acessos.find(x=>x.papel==='admin');return a?a.email:''}
 function urlPainel(){return location.origin+location.pathname}
-function pautaTexto(nome){return `1:1 bimestral (45 min) com ${nome}.\n\nPauta: 5' check-in · 10' KPIs · 10' comportamental/360° · 10' PDI e carreira · 5' o que você precisa de mim · 5' combinados com dono e prazo.\n\nAntes do encontro, preencha "Preparar 1:1" no painel: ${urlPainel()}`}
+function pautaTexto(nome){return `1:1 bimestral (45 min) com ${nome}.\n\nVamos conversar em 7 blocos: momento atual, expectativas com a empresa, aspiração profissional, desafios e pontos de melhoria, processo/rotina/gestão de tempo, plano de ação e feedback.\n\nAntes do encontro, entre no painel (${urlPainel()}), abra a aba "Minha visão do 1:1", escreva a sua visão em cada bloco e proponha as metas que acha justas.\n\nPrimeiro acesso: clique em "Primeiro acesso" e use o código que o Riccardo enviou por Teams/WhatsApp. Se não recebeu, peça a ele antes da reunião.`}
 function eventoIcs({uid,d,a,b,titulo,desc,org,para}){
   const L=['BEGIN:VEVENT','UID:'+uid,'DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').slice(0,15)+'Z','SEQUENCE:'+Math.floor(Date.now()/60000),
     'DTSTART:'+utcIcs(d,a),'DTEND:'+utcIcs(d,b),'SUMMARY:'+icsTxt(titulo),'DESCRIPTION:'+icsTxt(desc),'LOCATION:'+icsTxt('Microsoft Teams'),
@@ -1056,7 +1056,7 @@ function renderAcessos(){
   const url=location.origin+location.pathname;
   let cod='';
   if(S.codigoNovo){const c=S.codigoNovo;
-    const msg=`Olá, ${c.nome.split(' ')[0]}! O seu acompanhamento de 1:1 está em ${url}\n\nNo primeiro acesso, clique em "Primeiro acesso" e informe:\nE-mail: ${c.email}\nCódigo: ${c.codigo}\n\nDepois crie a sua senha. O código vale uma única vez e só para este e-mail.`;
+    const msg=`Olá, ${c.nome.split(' ')[0]}! O seu acompanhamento de 1:1 está em ${url}\n\nNo primeiro acesso, clique em "Primeiro acesso" e informe:\nE-mail: ${c.email}\nCódigo: ${c.codigo}\n\nDepois crie a sua senha. O código vale uma única vez e só para este e-mail.\n\nAntes do nosso 1:1, abra a aba "Minha visão do 1:1", escreva a sua visão em cada um dos 7 blocos e proponha as metas que você acha justas. Eu leio e comento antes da conversa.`;
     cod=`<div class="panel" style="border-color:var(--accent)"><h2>Código de ${esc(c.nome)}</h2><p class="hint">Este código aparece só agora. Ele não fica guardado em lugar nenhum: se perder, gere outro.</p>
     <div class="big" style="font-family:var(--mono);margin-bottom:10px">${esc(c.codigo)}</div>
     <div class="field"><label for="msg-cod">Mensagem pronta para enviar à pessoa (e-mail ou Teams)</label><textarea id="msg-cod" readonly style="min-height:150px">${esc(msg)}</textarea></div>
