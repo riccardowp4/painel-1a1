@@ -305,3 +305,9 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .vz-item{padding:8px 0;border-bottom:1px solid var(--line)}
 .vz h4{margin:10px 0 2px}
 @media (max-width:560px){.vb{gap:10px}.vb-n{width:24px;height:24px}}
+
+/* ===== Modo conversa (ficha compartilhável) ===== */
+.conv-aviso{display:none}
+#ficha.conversa .priv{display:none!important}
+#ficha.conversa .conv-aviso{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;border-left:4px solid var(--accent)}
+#ficha.conversa #fi-conversa{display:none}

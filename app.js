@@ -249,15 +249,16 @@ function ficha(id){
   const prop=S.prop[id]||{};
   const kRow=(g,l)=>`<tr><td>${esc(l)}${(prop[slug(l)]||{}).texto?`<div class="hint" style="margin:2px 0 0">Proposta: ${esc(prop[slug(l)].texto)}</div>`:''}</td><td><input type="text" data-kg="${g}" data-k="${slug(l)}" data-f="meta" value="${esc((kp[slug(l)]||{}).meta||'')}" placeholder="a definir" aria-label="Meta: ${esc(l)}"></td><td style="width:96px"><input type="number" min="0" max="100" data-kg="${g}" data-k="${slug(l)}" data-f="ating" value="${esc((kp[slug(l)]||{}).ating??'')}" aria-label="Atingimento: ${esc(l)}"></td></tr>`;
   d.innerHTML=`<div class="fi">
-   <div class="fi-top"><div class="l"><span class="av" aria-hidden="true">${esc(ini(p.nome))}</span><div style="min-width:0"><h2>${esc(p.nome)}</h2><div class="sub">${esc(p.cargo||'')}</div></div></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">${pill(p)}<button class="btn sec" id="ver-como">Ver como a pessoa vê</button><button class="x" data-close aria-label="Fechar">×</button></div></div>
+   <div class="fi-top"><div class="l"><span class="av" aria-hidden="true">${esc(ini(p.nome))}</span><div style="min-width:0"><h2>${esc(p.nome)}</h2><div class="sub">${esc(p.cargo||'')}</div></div></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end"><span class="priv">${pill(p)}</span><button class="btn" id="fi-conversa">Modo conversa</button><button class="btn sec priv" id="ver-como">Ver como a pessoa vê</button><button class="x" data-close aria-label="Fechar">×</button></div></div>
    <div class="panel"><div class="two"><div class="field"><label for="fi-area">Área</label><select id="fi-area"><option value="">${mudou?'Voltar para '+esc(p.areaOriginal):esc(a.nome)+' (informada)'}</option>${AREAS.map(x=>`<option ${mudou&&p.area===x?'selected':''}>${x}</option>`).join('')}</select><span class="hint" style="margin:0">${mudou?'Definida por você':'Fonte: '+esc(p.fonteArea||'')}</span></div>
      <div class="field"><label for="fi-slot">Horário do 1:1 no ciclo 1</label><select id="fi-slot"></select></div></div>
      <div class="facts"><div><div class="l">Técnica</div><div class="v">${f2(p.t)}</div></div><div><div class="l">Postura</div><div class="v">${f2(p.p)}</div></div><div><div class="l">Média 360°</div><div class="v">${f2(p.m)}</div></div><div><div class="l">Avaliações</div><div class="v">${p.n||'—'}</div></div></div></div>
-   <div id="fi-outlook"></div>
-   <div class="panel"><h3>O que o 360° diz (ago/2026)</h3><p style="margin:0 0 8px"><strong>Pontos fortes:</strong> ${esc(p.fortesTxt||'')}</p>${(p.melhTxt||[]).length?`<p style="margin:0 0 4px"><strong>Pontos de melhoria (${p.melh}):</strong></p><ul>${p.melhTxt.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p style="margin:0"><strong>Pontos de melhoria:</strong> nenhum registrado.</p>'}<p class="hint" style="margin:8px 0 0">Síntese dos comentários anônimos. O 360° é confidencial: não cite avaliadores. Esta parte só você vê.</p></div>
+   <div class="note conv-aviso">Modo conversa: pode compartilhar a tela. Nota privada, 360°, roteiro e registro estão ocultos. <button class="btn sec sm" id="fi-conversa-sair">Sair do modo conversa</button></div>
+   <div id="fi-outlook" class="priv"></div>
+   <div class="panel priv"><h3>O que o 360° diz (ago/2026)</h3><p style="margin:0 0 8px"><strong>Pontos fortes:</strong> ${esc(p.fortesTxt||'')}</p>${(p.melhTxt||[]).length?`<p style="margin:0 0 4px"><strong>Pontos de melhoria (${p.melh}):</strong></p><ul>${p.melhTxt.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p style="margin:0"><strong>Pontos de melhoria:</strong> nenhum registrado.</p>'}<p class="hint" style="margin:8px 0 0">Síntese dos comentários anônimos. O 360° é confidencial: não cite avaliadores. Esta parte só você vê.</p></div>
    <div class="panel"><h3>Visão da pessoa e seus comentários</h3><div id="fi-pessoa"></div></div>
-   <div class="panel"><h3>Último 1:1 antes do ciclo</h3>${p.ultimo?`<p style="margin:0 0 4px"><strong>${esc(p.ultimo.data)}</strong> · <span class="hint">${esc(p.ultimo.fonte||'')}</span></p><p style="margin:0">${esc(p.ultimo.resumo)}</p>`:`<p class="hint" style="margin:0">Sem registro anterior.${p.obs?' '+esc(p.obs):''}</p>`}</div>
-   <div class="panel"><h3>Roteiro do 1:1 · 45 min</h3><p class="hint" style="margin:0 0 8px">7 blocos, preenchidos para ${esc(p.nome.split(' ')[0])} (${TIPO_ROT[roteiro(p).tipo]}). Use "Conduzir este 1:1" durante a reunião.</p>${htmlRoteiro(p)}</div>
+   <div class="panel priv"><h3>Último 1:1 antes do ciclo</h3>${p.ultimo?`<p style="margin:0 0 4px"><strong>${esc(p.ultimo.data)}</strong> · <span class="hint">${esc(p.ultimo.fonte||'')}</span></p><p style="margin:0">${esc(p.ultimo.resumo)}</p>`:`<p class="hint" style="margin:0">Sem registro anterior.${p.obs?' '+esc(p.obs):''}</p>`}</div>
+   <div class="panel priv"><h3>Roteiro do 1:1 · 45 min</h3><p class="hint" style="margin:0 0 8px">7 blocos, preenchidos para ${esc(p.nome.split(' ')[0])} (${TIPO_ROT[roteiro(p).tipo]}). Use "Conduzir este 1:1" durante a reunião.</p>${htmlRoteiro(p)}</div>
    <div class="panel"><h3>KPIs do ciclo</h3><p class="hint">Salva ao sair do campo. A pessoa vê a meta e o atingimento na hora.</p>
      <div class="tot"><div><div class="l">Empresa (50%)</div><div class="v" id="t-emp">${pct(t.emp)}</div></div><div><div class="l">Equipe (10%)</div><div class="v" id="t-eq">${pct(t.eq)}</div></div><div><div class="l">Individual (20%)</div><div class="v" id="t-pf">${pct(t.pf)}</div></div><div><div class="l">Comportamental (20%)</div><div class="v" id="t-cp">${pct(t.cp)}</div></div><div><div class="l">Total</div><div class="v" id="t-tot">${pct(t.tot)}</div></div></div>
      <div class="scroll"><table><thead><tr><th>KPI</th><th>Meta (definida com a pessoa)</th><th>Atingimento %</th></tr></thead><tbody>
@@ -267,16 +268,17 @@ function ficha(id){
    <div class="panel"><h3>Ações e combinados</h3><div id="fi-acoes"></div>
      <div class="two" style="margin-top:10px"><div class="field"><label for="na-t">Nova ação</label><input id="na-t" type="text" placeholder="O que será feito"></div><div class="two"><div class="field"><label for="na-p">Prazo</label><input id="na-p" type="date"></div><div class="field"><label for="na-o">Tipo</label><select id="na-o"><option value="1:1 ciclo 1">Combinado do 1:1</option>${PDI_TIPOS.map(([o,l])=>`<option value="${o}">PDI: ${l}</option>`).join('')}</select></div><div class="field"><label for="na-d">Dono</label><select id="na-d"><option>${esc(p.nome)}</option><option>Riccardo</option></select></div></div></div>
      <button class="btn sec" id="na-add">Adicionar ação</button></div>
-   <div class="panel"><h3>Registrar 1:1</h3>
+   <div class="panel priv"><h3>Registrar 1:1</h3>
      <div class="two"><div class="field"><label for="f-data">Data</label><input id="f-data" type="date" value="${hoje()}"></div><div class="field"><label for="f-humor">Como a pessoa chegou</label><select id="f-humor"><option value="3">Regular</option><option value="1">Muito mal</option><option value="2">Abaixo do normal</option><option value="4">Bem</option><option value="5">Muito bem</option></select></div></div>
      <div class="field"><label for="f-res">O que foi conversado (a pessoa vê)</label><textarea id="f-res" placeholder="KPIs, comportamento, carreira, o que a pessoa pediu de você"></textarea></div>
      <div class="field"><label for="f-prox">Combinados e próximos passos (a pessoa vê)</label><textarea id="f-prox"></textarea></div>
      <div class="field"><label for="f-nota">Nota privada (só você vê): aqui entra o que for pessoal</label><textarea id="f-nota"></textarea></div>
      <label style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><input type="checkbox" id="f-dev"> Devolvi o que mudou desde o último 1:1</label>
      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="f-save">Salvar 1:1</button><button class="btn sec" id="f-estrutura">Preencher com a estrutura do roteiro</button></div></div>
-   <div class="panel"><h3>1:1s deste ciclo</h3><div id="fi-hist"></div></div>
-   <div class="panel"><h3>Histórico de mudanças desta pessoa</h3><div id="fi-atu"></div></div>
+   <div class="panel priv"><h3>1:1s deste ciclo</h3><div id="fi-hist"></div></div>
+   <div class="panel priv"><h3>Histórico de mudanças desta pessoa</h3><div id="fi-atu"></div></div>
   </div>`;
+  d.classList.remove('conversa');
   fichaDin();
   if(!d.open)d.showModal();
   d.scrollTop=0;
@@ -351,6 +353,13 @@ async function salvarKpi(p,chave,grupo,campo,valor){
   const r=await S.sb.from('kpis').upsert(linha,{onConflict:'pessoa_id,ciclo,chave'});if(r.error)throw r.error;
   await CARGA.kpis();
 }
+
+/* modo conversa: esconde o que é privado para compartilhar a tela com a pessoa */
+document.addEventListener('click',e=>{
+  if(S.papel!=='admin')return;
+  const id=e.target.id;
+  if(id==='fi-conversa'||id==='fi-conversa-sair'){const d=$('#ficha');d.classList.toggle('conversa',id==='fi-conversa');d.scrollTop=0}
+});
 
 /* ---- 45-roteiro.js ---- */
 /* ===== Roteiro do 1:1 em 7 blocos e modo de condução interativo =====
@@ -1060,7 +1069,8 @@ function renderAcessos(){
     cod=`<div class="panel" style="border-color:var(--accent)"><h2>Código de ${esc(c.nome)}</h2><p class="hint">Este código aparece só agora. Ele não fica guardado em lugar nenhum: se perder, gere outro.</p>
     <div class="big" style="font-family:var(--mono);margin-bottom:10px">${esc(c.codigo)}</div>
     <div class="field"><label for="msg-cod">Mensagem pronta para enviar à pessoa (e-mail ou Teams)</label><textarea id="msg-cod" readonly style="min-height:150px">${esc(msg)}</textarea></div>
-    <button class="btn" id="copiar-msg">Copiar mensagem</button> <button class="btn sec" id="fechar-cod">Fechar</button></div>`}
+    <a class="btn" href="mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent('Seu acesso ao acompanhamento de 1:1')}&body=${encodeURIComponent(msg+'\n\nAbraço,\nRiccardo')}">Enviar por e-mail</a> <button class="btn sec" id="copiar-msg">Copiar mensagem</button> <button class="btn sec" id="fechar-cod">Fechar</button>
+    <p class="hint" style="margin:8px 0 0">"Enviar por e-mail" abre o seu programa de e-mail com a mensagem pronta para ${esc(c.email)}. Confira e clique em Enviar.</p></div>`}
   $('#tab-acessos').innerHTML=`<div class="panel"><h2>Quem pode entrar</h2><p class="hint" style="margin:0">Só entra quem tem um e-mail cadastrado aqui e o código que você gerou para ele. No primeiro acesso, a pessoa cria a própria senha, que fica guardada com criptografia no servidor. O código deixa de valer depois de usado. Para trocar a senha de alguém, use "Resetar acesso": a senha atual para de funcionar e você recebe um código novo para enviar.</p></div>
   ${cod}
   <div class="panel scroll"><table><thead><tr><th>Pessoa</th><th>E-mail</th><th>Situação</th><th></th></tr></thead><tbody>
